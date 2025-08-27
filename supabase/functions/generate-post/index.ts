@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -69,7 +68,7 @@ serve(async (req) => {
     console.log('Fetching LinkedIn token for user:', userId)
     const { data: tokenData, error: tokenError } = await supabase
       .from('linkedin_tokens')
-      .select('access_token, expires_at')
+      .select('access_token, expires_at, person_urn')
       .eq('user_id', userId)
       .single()
 
@@ -90,14 +89,15 @@ serve(async (req) => {
     console.log('LinkedIn token retrieved successfully')
     console.log('Preparing to call n8n webhook...')
 
-    // Prepare data for n8n webhook with LinkedIn token
+    // Prepare data for n8n webhook with LinkedIn token and person_urn
     const webhookData = {
       body: {
         postId: postId,
         audioFile: audioFile,
         audioFileName: audioFileName || 'recording.wav',
         language: language || 'en-US',
-        linkedinToken: tokenData.access_token
+        linkedinToken: tokenData.access_token,
+        linkedin_person_urn: tokenData.person_urn
       }
     }
 
@@ -106,7 +106,8 @@ serve(async (req) => {
       audioFileName: audioFileName || 'recording.wav',
       audioFileSize: audioFile.length,
       language: language || 'en-US',
-      hasLinkedinToken: !!tokenData.access_token
+      hasLinkedinToken: !!tokenData.access_token,
+      hasPersonUrn: !!tokenData.person_urn
     })
 
     // Call n8n webhook to generate post
