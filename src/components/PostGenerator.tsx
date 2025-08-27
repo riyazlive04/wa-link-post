@@ -129,40 +129,23 @@ export const PostGenerator = () => {
     try {
       console.log('Publishing post with content:', generatedContent);
 
-      // Update post status to publishing
-      await supabase
-        .from('posts')
-        .update({ status: 'publishing' })
-        .eq('id', postId);
-
-      // Call n8n webhook with user ID for token lookup
-      const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      // Call the publish-post edge function instead of directly calling n8n
+      const { data, error: functionError } = await supabase.functions.invoke('publish-post', {
+        body: {
           userId: user.id,
           postId: postId,
           content: generatedContent
-        })
+        }
       });
 
-      const result = await response.json();
-      console.log('n8n webhook response:', result);
+      if (functionError) {
+        console.error('Publish edge function error:', functionError);
+        throw functionError;
+      }
 
-      if (response.ok && result.success) {
-        // Store the actual LinkedIn post URL
-        const linkedinPostUrl = result.postUrl || result.linkedinPostUrl || result.url;
-        
-        await supabase
-          .from('posts')
-          .update({ 
-            linkedin_post_id: linkedinPostUrl || 'published',
-            status: 'published'
-          })
-          .eq('id', postId);
+      console.log('Publish post response:', data);
 
+      if (data?.success) {
         setStatus('Post published successfully!');
         
         toast({
@@ -177,7 +160,7 @@ export const PostGenerator = () => {
         setPostId(null);
         setLanguage('en-US'); // Reset to default language
       } else {
-        throw new Error(result?.error || 'Failed to publish post to LinkedIn');
+        throw new Error(data?.error || 'Failed to publish post to LinkedIn');
       }
 
     } catch (error: any) {
