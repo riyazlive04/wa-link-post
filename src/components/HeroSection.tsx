@@ -1,5 +1,6 @@
 import { MessageSquare, Linkedin, Zap, ArrowRight, Sparkles, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
 export const HeroSection = () => {
   return <section className="section-spacing bg-gradient-to-br from-background via-primary/5 to-accent/10 relative overflow-hidden">
       {/* Animated background elements */}
@@ -39,7 +40,7 @@ export const HeroSection = () => {
           </div>
 
           <h1 className="heading-display mb-8 bg-gradient-to-r from-foreground via-primary to-accent bg-clip-text text-transparent animate-slide-up">
-            Transform WhatsApp Messages into
+            Transform Your Voice Message into
             <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-pulse">
               Professional LinkedIn Posts
             </span>
@@ -48,7 +49,7 @@ export const HeroSection = () => {
           <p className="body-large mb-10 max-w-2xl mx-auto animate-slide-up leading-relaxed" style={{
           animationDelay: '0.2s'
         }}>
-            Send a simple WhatsApp message and watch as AI transforms your thoughts 
+            Send a simple Voice message and watch as AI transforms your thoughts 
             into engaging, professional LinkedIn content that gets published automatically.
             <span className="block mt-2 text-primary font-medium">✨ It's like magic, but for LinkedIn!</span>
           </p>
@@ -80,7 +81,7 @@ export const HeroSection = () => {
                   <MessageSquare className="h-8 w-8 text-primary" />
                 </div>
               </div>
-              <h3 className="heading-small mb-3 group-hover:text-primary transition-colors">Simply send your ideas via Your Voice and let the magic begin</h3>
+              <h3 className="heading-small mb-3 group-hover:text-primary transition-colors">Send Message</h3>
               <p className="body-small">Simply send your ideas via WhatsApp and let the magic begin</p>
             </div>
 
