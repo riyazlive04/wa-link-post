@@ -1,34 +1,31 @@
 
-import { Linkedin, Settings, BarChart3, Sparkles, Bot } from "lucide-react";
+import { Linkedin, Settings, BarChart3, Sparkles, Bot, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Navbar = () => {
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
 
-  const handleLinkedInLogin = async () => {
+  const handleSignOut = async () => {
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'linkedin_oidc',
-        options: {
-          redirectTo: `${window.location.origin}/`
-        }
-      });
-
-      if (error) {
-        console.error('LinkedIn login error:', error);
-        toast({
-          title: "Login Error",
-          description: "Failed to connect to LinkedIn. Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      console.error('LinkedIn login error:', err);
+      await signOut();
       toast({
-        title: "Login Error",
-        description: "An unexpected error occurred. Please try again.",
+        title: "Signed out",
+        description: "You have been signed out successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
         variant: "destructive",
       });
     }
@@ -59,27 +56,38 @@ export const Navbar = () => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex items-center space-x-2 hover:bg-primary/10 border border-transparent hover:border-primary/20 transition-all duration-200"
-              onClick={handleLinkedInLogin}
-            >
-              <Linkedin className="h-4 w-4" />
-              <span className="hidden sm:inline">Connect LinkedIn</span>
-              <div className="relative">
-                <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                <div className="absolute inset-0 w-2 h-2 bg-success rounded-full animate-ping"></div>
-              </div>
-            </Button>
+            {user && (
+              <>
+                <Button variant="ghost" size="sm" className="hover:bg-accent/10 border border-transparent hover:border-accent/20 transition-all duration-200">
+                  <BarChart3 className="h-4 w-4 hover:text-accent transition-colors" />
+                </Button>
 
-            <Button variant="ghost" size="sm" className="hover:bg-accent/10 border border-transparent hover:border-accent/20 transition-all duration-200">
-              <BarChart3 className="h-4 w-4 hover:text-accent transition-colors" />
-            </Button>
+                <Button variant="ghost" size="sm" className="hover:bg-muted/50 border border-transparent hover:border-border transition-all duration-200">
+                  <Settings className="h-4 w-4 hover:rotate-90 transition-transform duration-300" />
+                </Button>
 
-            <Button variant="ghost" size="sm" className="hover:bg-muted/50 border border-transparent hover:border-border transition-all duration-200">
-              <Settings className="h-4 w-4 hover:rotate-90 transition-transform duration-300" />
-            </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                      <User className="h-4 w-4" />
+                      <span className="hidden sm:inline text-sm">
+                        {user.email?.split('@')[0] || 'User'}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                      {user.email}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Sign out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
           </div>
         </div>
       </div>

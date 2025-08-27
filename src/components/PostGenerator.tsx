@@ -1,9 +1,11 @@
+
 import { useState } from 'react';
 import { AudioInput } from './AudioInput';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Send, CheckCircle, AlertCircle } from 'lucide-react';
 
@@ -15,6 +17,7 @@ export const PostGenerator = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [postId, setPostId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const handleAudioReady = (blob: Blob, fileName: string) => {
@@ -23,10 +26,10 @@ export const PostGenerator = () => {
   };
 
   const generatePost = async () => {
-    if (!audioBlob) {
+    if (!audioBlob || !user) {
       toast({
         title: "Error",
-        description: "Please record or upload an audio file first.",
+        description: !user ? "Please sign in to generate posts." : "Please record or upload an audio file first.",
         variant: "destructive"
       });
       return;
@@ -38,12 +41,13 @@ export const PostGenerator = () => {
     try {
       console.log('Creating new post with audio file:', audioFileName);
 
-      // Create a new post record for demo mode (user_id will be null)
+      // Create a new post record for authenticated user
       const { data: post, error } = await supabase
         .from('posts')
         .insert({
           audio_file_name: audioFileName,
-          status: 'generating'
+          status: 'generating',
+          user_id: user.id
         })
         .select()
         .single();
@@ -92,7 +96,7 @@ export const PostGenerator = () => {
         throw new Error(data?.error || 'Failed to generate content');
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating post:', error);
       setStatus('Failed to generate post');
       toast({
@@ -106,10 +110,10 @@ export const PostGenerator = () => {
   };
 
   const publishPost = async () => {
-    if (!postId || !generatedContent) {
+    if (!postId || !generatedContent || !user) {
       toast({
         title: "Error",
-        description: "No post to publish.",
+        description: "No post to publish or user not authenticated.",
         variant: "destructive"
       });
       return;
@@ -127,18 +131,16 @@ export const PostGenerator = () => {
         .update({ status: 'publishing' })
         .eq('id', postId);
 
-      // Call n8n webhook directly
+      // Call n8n webhook with user ID for token lookup
       const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          payload: {
-            postText: generatedContent,
-            media: null
-          },
-          callbackUrl: "https://lovable.app/your-cb-if-you-use-callback"
+          userId: user.id,
+          postId: postId,
+          content: generatedContent
         })
       });
 
@@ -146,7 +148,7 @@ export const PostGenerator = () => {
       console.log('n8n webhook response:', result);
 
       if (response.ok && result.success) {
-        // Store the actual LinkedIn post URL instead of just 'published'
+        // Store the actual LinkedIn post URL
         const linkedinPostUrl = result.postUrl || result.linkedinPostUrl || result.url;
         
         await supabase
@@ -173,7 +175,7 @@ export const PostGenerator = () => {
         throw new Error(result?.error || 'Failed to publish post to LinkedIn');
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error publishing post:', error);
       
       // Update status to failed
@@ -193,20 +195,25 @@ export const PostGenerator = () => {
     }
   };
 
+  if (!user) {
+    return (
+      <div className="space-y-6 post-generator-section">
+        <Card className="border-yellow-200 bg-yellow-50/50">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2 text-yellow-700">
+              <AlertCircle className="h-5 w-5" />
+              <p className="text-sm">
+                <strong>Authentication Required:</strong> Please sign in to generate and publish LinkedIn posts.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 post-generator-section">
-      {/* Demo Mode Notice */}
-      <Card className="border-blue-200 bg-blue-50/50">
-        <CardContent className="pt-6">
-          <div className="flex items-center space-x-2 text-blue-700">
-            <AlertCircle className="h-5 w-5" />
-            <p className="text-sm">
-              <strong>Demo Mode:</strong> Posts are created without authentication for testing purposes.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle>Generate LinkedIn Post</CardTitle>

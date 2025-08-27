@@ -18,70 +18,114 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { postId } = await req.json()
+    const { userId, postId, content } = await req.json()
 
-    // Get post content
-    const { data: post } = await supabase
-      .from('posts')
-      .select('content')
-      .eq('id', postId)
+    console.log('Publishing post for user:', userId)
+
+    // Get LinkedIn tokens for the user
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('linkedin_tokens')
+      .select('access_token, expires_at')
+      .eq('user_id', userId)
       .single()
 
-    if (!post) {
-      throw new Error('Post not found')
+    if (tokenError || !tokenData) {
+      console.error('No LinkedIn tokens found for user:', userId)
+      throw new Error('LinkedIn authentication required. Please connect your LinkedIn account.')
     }
 
-    // Update status to publishing
+    // Check if token is expired
+    const now = new Date()
+    const expiresAt = new Date(tokenData.expires_at)
+    
+    if (now >= expiresAt) {
+      console.error('LinkedIn token expired for user:', userId)
+      throw new Error('LinkedIn token expired. Please reconnect your LinkedIn account.')
+    }
+
+    // Update post status to publishing
     await supabase
       .from('posts')
       .update({ status: 'publishing' })
       .eq('id', postId)
 
-    // Call n8n webhook to publish post
-    const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
+    // Prepare LinkedIn post data
+    const postData = {
+      author: tokenData.person_urn || 'urn:li:person:unknown',
+      lifecycleState: 'PUBLISHED',
+      specificContent: {
+        'com.linkedin.ugc.ShareContent': {
+          shareCommentary: {
+            text: content
+          },
+          shareMediaCategory: 'NONE'
+        }
+      },
+      visibility: {
+        'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+      }
+    }
+
+    // Post to LinkedIn
+    const linkedinResponse = await fetch('https://api.linkedin.com/v2/ugcPosts', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0'
       },
-      body: JSON.stringify({
-        content: post.content,
-        postId: postId
-      })
+      body: JSON.stringify(postData)
     })
 
-    const result = await response.json()
-
-    if (response.ok) {
-      // Update post with LinkedIn post ID and status
-      await supabase
-        .from('posts')
-        .update({ 
-          linkedin_post_id: result.linkedinPostId,
-          status: 'published'
-        })
-        .eq('id', postId)
-
-      return new Response(
-        JSON.stringify({ success: true, linkedinPostId: result.linkedinPostId }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    } else {
-      throw new Error('Failed to publish post')
+    if (!linkedinResponse.ok) {
+      const errorText = await linkedinResponse.text()
+      console.error('LinkedIn API error:', errorText)
+      throw new Error(`LinkedIn API error: ${linkedinResponse.status} ${errorText}`)
     }
+
+    const linkedinResult = await linkedinResponse.json()
+    console.log('LinkedIn post created:', linkedinResult.id)
+
+    // Update post with LinkedIn post ID and status
+    const linkedinPostUrl = `https://www.linkedin.com/feed/update/${linkedinResult.id}`
+    
+    await supabase
+      .from('posts')
+      .update({ 
+        linkedin_post_id: linkedinPostUrl,
+        status: 'published'
+      })
+      .eq('id', postId)
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        postUrl: linkedinPostUrl,
+        linkedinPostId: linkedinResult.id 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
     console.error('Error publishing post:', error)
     
-    // Update status to failed
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-    
-    await supabase
-      .from('posts')
-      .update({ status: 'failed' })
-      .eq('id', req.json().then(data => data.postId))
+    // Update status to failed if we have the necessary data
+    try {
+      const requestData = await req.json()
+      if (requestData.postId) {
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        )
+        
+        await supabase
+          .from('posts')
+          .update({ status: 'failed' })
+          .eq('id', requestData.postId)
+      }
+    } catch (updateError) {
+      console.error('Error updating failed status:', updateError)
+    }
 
     return new Response(
       JSON.stringify({ error: error.message }),
