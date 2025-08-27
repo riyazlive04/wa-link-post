@@ -67,21 +67,19 @@ serve(async (req) => {
       console.log('Using current member ID with shares API:', tokenData.member_id);
     }
 
-    // Call n8n webhook with the appropriate configuration
-    const webhookData = {
-      body: {
-        postText: content,
-        linkedinToken: tokenData.access_token,
-        linkedinAuthorUrn: authorUrn,
-        apiEndpoint: apiEndpoint, // Tell n8n which API to use
-        // Keep backward compatibility
-        linkedin_person_urn: tokenData.person_urn,
-        linkedinMemberId: tokenData.member_id,
-        legacyMemberId: tokenData.legacy_member_id
-      }
+    // Prepare webhook payload
+    const webhookPayload = {
+      postText: content,
+      linkedinToken: tokenData.access_token,
+      linkedinAuthorUrn: authorUrn,
+      apiEndpoint: apiEndpoint,
+      // Keep backward compatibility
+      linkedin_person_urn: tokenData.person_urn,
+      linkedinMemberId: tokenData.member_id,
+      legacyMemberId: tokenData.legacy_member_id
     }
 
-    console.log('Calling n8n publish webhook with data:', {
+    console.log('Calling n8n publish webhook with payload:', {
       postId,
       hasContent: !!content,
       hasLinkedinToken: !!tokenData.access_token,
@@ -90,24 +88,32 @@ serve(async (req) => {
       memberId: tokenData.member_id,
       legacyMemberId: tokenData.legacy_member_id,
       linkedinAuthorUrn: authorUrn,
-      apiEndpoint: apiEndpoint,
-      webhookPayload: webhookData
+      apiEndpoint: apiEndpoint
     })
 
-    const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
+    // Call n8n webhook
+    const webhookResponse = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(webhookData)
+      body: JSON.stringify(webhookPayload)
     })
 
-    const result = await response.json()
-    console.log('n8n webhook response:', result)
+    console.log('n8n webhook response status:', webhookResponse.status)
 
-    if (response.ok && result.success) {
+    if (!webhookResponse.ok) {
+      const errorText = await webhookResponse.text()
+      console.error('n8n webhook error:', errorText)
+      throw new Error(`n8n webhook failed: ${webhookResponse.status} - ${errorText}`)
+    }
+
+    const webhookResult = await webhookResponse.json()
+    console.log('n8n webhook response:', webhookResult)
+
+    if (webhookResult.success) {
       // Store the actual LinkedIn post URL
-      const linkedinPostUrl = result.postUrl || result.linkedinPostUrl || result.url;
+      const linkedinPostUrl = webhookResult.postUrl || webhookResult.linkedinPostUrl || webhookResult.url;
       
       await supabase
         .from('posts')
@@ -121,14 +127,14 @@ serve(async (req) => {
         JSON.stringify({ 
           success: true, 
           postUrl: linkedinPostUrl,
-          linkedinPostId: result.linkedinPostId || result.id,
+          linkedinPostId: webhookResult.linkedinPostId || webhookResult.id,
           usedApiEndpoint: apiEndpoint
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
 
     } else {
-      throw new Error(result?.error || 'Failed to publish post to LinkedIn')
+      throw new Error(webhookResult?.error || 'Failed to publish post to LinkedIn')
     }
 
   } catch (error) {

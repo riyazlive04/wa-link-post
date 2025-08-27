@@ -19,6 +19,7 @@ export type Database = {
           access_token: string
           created_at: string | null
           expires_at: string
+          legacy_member_id: string | null
           member_id: string | null
           person_urn: string
           refresh_token: string | null
@@ -30,6 +31,7 @@ export type Database = {
           access_token: string
           created_at?: string | null
           expires_at: string
+          legacy_member_id?: string | null
           member_id?: string | null
           person_urn: string
           refresh_token?: string | null
@@ -41,6 +43,7 @@ export type Database = {
           access_token?: string
           created_at?: string | null
           expires_at?: string
+          legacy_member_id?: string | null
           member_id?: string | null
           person_urn?: string
           refresh_token?: string | null
