@@ -49,62 +49,55 @@ serve(async (req) => {
       .update({ status: 'publishing' })
       .eq('id', postId)
 
-    // Prepare LinkedIn post data
-    const postData = {
-      author: tokenData.person_urn || 'urn:li:person:unknown',
-      lifecycleState: 'PUBLISHED',
-      specificContent: {
-        'com.linkedin.ugc.ShareContent': {
-          shareCommentary: {
-            text: content
-          },
-          shareMediaCategory: 'NONE'
-        }
-      },
-      visibility: {
-        'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+    // Call n8n webhook with post content and LinkedIn token
+    const webhookData = {
+      body: {
+        postText: content,
+        linkedinToken: tokenData.access_token
       }
     }
 
-    // Post to LinkedIn
-    const linkedinResponse = await fetch('https://api.linkedin.com/v2/ugcPosts', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'Content-Type': 'application/json',
-        'X-Restli-Protocol-Version': '2.0.0'
-      },
-      body: JSON.stringify(postData)
+    console.log('Calling n8n publish webhook with data:', {
+      postId,
+      hasContent: !!content,
+      hasLinkedinToken: !!tokenData.access_token
     })
 
-    if (!linkedinResponse.ok) {
-      const errorText = await linkedinResponse.text()
-      console.error('LinkedIn API error:', errorText)
-      throw new Error(`LinkedIn API error: ${linkedinResponse.status} ${errorText}`)
+    const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(webhookData)
+    })
+
+    const result = await response.json()
+    console.log('n8n webhook response:', result)
+
+    if (response.ok && result.success) {
+      // Store the actual LinkedIn post URL
+      const linkedinPostUrl = result.postUrl || result.linkedinPostUrl || result.url;
+      
+      await supabase
+        .from('posts')
+        .update({ 
+          linkedin_post_id: linkedinPostUrl || 'published',
+          status: 'published'
+        })
+        .eq('id', postId)
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          postUrl: linkedinPostUrl,
+          linkedinPostId: result.linkedinPostId || result.id
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+
+    } else {
+      throw new Error(result?.error || 'Failed to publish post to LinkedIn')
     }
-
-    const linkedinResult = await linkedinResponse.json()
-    console.log('LinkedIn post created:', linkedinResult.id)
-
-    // Update post with LinkedIn post ID and status
-    const linkedinPostUrl = `https://www.linkedin.com/feed/update/${linkedinResult.id}`
-    
-    await supabase
-      .from('posts')
-      .update({ 
-        linkedin_post_id: linkedinPostUrl,
-        status: 'published'
-      })
-      .eq('id', postId)
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        postUrl: linkedinPostUrl,
-        linkedinPostId: linkedinResult.id 
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
 
   } catch (error) {
     console.error('Error publishing post:', error)

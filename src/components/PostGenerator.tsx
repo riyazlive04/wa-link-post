@@ -68,15 +68,16 @@ export const PostGenerator = () => {
       const uint8Array = new Uint8Array(arrayBuffer);
       const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
 
-      console.log('Calling generate-post function with postId:', post.id, 'Language:', language);
+      console.log('Calling generate-post function with postId:', post.id, 'Language:', language, 'UserId:', user.id);
 
-      // Call the generate-post edge function with language parameter
+      // Call the generate-post edge function with language parameter and userId
       const { data, error: functionError } = await supabase.functions.invoke('generate-post', {
         body: {
           postId: post.id,
           audioFile: base64Audio,
           audioFileName: audioFileName,
-          language: language
+          language: language,
+          userId: user.id
         }
       });
 

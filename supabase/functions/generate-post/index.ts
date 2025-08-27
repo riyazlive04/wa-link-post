@@ -24,7 +24,8 @@ serve(async (req) => {
       audioFileName: requestData.audioFileName,
       audioFilePresent: !!requestData.audioFile,
       audioFileLength: requestData.audioFile ? requestData.audioFile.length : 0,
-      language: requestData.language || 'en-US'
+      language: requestData.language || 'en-US',
+      userId: requestData.userId
     })
     
     // Use service role key to bypass RLS
@@ -33,7 +34,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { postId, audioFile, audioFileName, language } = requestData
+    const { postId, audioFile, audioFileName, language, userId } = requestData
 
     if (!postId) {
       throw new Error('postId is required')
@@ -41,6 +42,10 @@ serve(async (req) => {
 
     if (!audioFile) {
       throw new Error('audioFile is required')
+    }
+
+    if (!userId) {
+      throw new Error('userId is required')
     }
 
     // Update post status to generating
@@ -59,21 +64,49 @@ serve(async (req) => {
     }
 
     console.log('Post status updated successfully')
+
+    // Fetch LinkedIn access token for the user
+    console.log('Fetching LinkedIn token for user:', userId)
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('linkedin_tokens')
+      .select('access_token, expires_at')
+      .eq('user_id', userId)
+      .single()
+
+    if (tokenError || !tokenData) {
+      console.error('No LinkedIn tokens found for user:', userId)
+      throw new Error('LinkedIn authentication required. Please connect your LinkedIn account.')
+    }
+
+    // Check if token is expired
+    const now = new Date()
+    const expiresAt = new Date(tokenData.expires_at)
+    
+    if (now >= expiresAt) {
+      console.error('LinkedIn token expired for user:', userId)
+      throw new Error('LinkedIn token expired. Please reconnect your LinkedIn account.')
+    }
+
+    console.log('LinkedIn token retrieved successfully')
     console.log('Preparing to call n8n webhook...')
 
-    // Prepare data for n8n webhook with language specification
+    // Prepare data for n8n webhook with LinkedIn token
     const webhookData = {
-      postId: postId,
-      audioFile: audioFile,
-      audioFileName: audioFileName || 'recording.wav',
-      language: language || 'en-US'
+      body: {
+        postId: postId,
+        audioFile: audioFile,
+        audioFileName: audioFileName || 'recording.wav',
+        language: language || 'en-US',
+        linkedinToken: tokenData.access_token
+      }
     }
 
     console.log('Calling n8n webhook with data:', {
       postId,
       audioFileName: audioFileName || 'recording.wav',
       audioFileSize: audioFile.length,
-      language: language || 'en-US'
+      language: language || 'en-US',
+      hasLinkedinToken: !!tokenData.access_token
     })
 
     // Call n8n webhook to generate post
