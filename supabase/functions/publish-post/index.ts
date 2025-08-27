@@ -44,6 +44,11 @@ serve(async (req) => {
       throw new Error('LinkedIn person URN missing. Please reconnect your LinkedIn account.')
     }
 
+    // Extract numeric LinkedIn member ID from person_urn
+    const linkedinMemberId = tokenData.person_urn.replace('urn:li:person:', '')
+    
+    console.log('Extracted LinkedIn member ID:', linkedinMemberId, 'from person_urn:', tokenData.person_urn)
+
     // Check if token is expired
     const now = new Date()
     const expiresAt = new Date(tokenData.expires_at)
@@ -59,12 +64,13 @@ serve(async (req) => {
       .update({ status: 'publishing' })
       .eq('id', postId)
 
-    // Call n8n webhook with post content, LinkedIn token, and person_urn
+    // Call n8n webhook with post content, LinkedIn token, person_urn, and numeric member ID
     const webhookData = {
       body: {
         postText: content,
         linkedinToken: tokenData.access_token,
-        linkedin_person_urn: tokenData.person_urn
+        linkedin_person_urn: tokenData.person_urn,
+        linkedinMemberId: linkedinMemberId
       }
     }
 
@@ -74,6 +80,7 @@ serve(async (req) => {
       hasLinkedinToken: !!tokenData.access_token,
       hasPersonUrn: !!tokenData.person_urn,
       personUrn: tokenData.person_urn,
+      linkedinMemberId: linkedinMemberId,
       webhookPayload: webhookData
     })
 
