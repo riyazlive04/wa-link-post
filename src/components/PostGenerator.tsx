@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Send, CheckCircle } from 'lucide-react';
+import { Loader2, Send, CheckCircle, AlertCircle } from 'lucide-react';
 
 export const PostGenerator = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -37,13 +37,12 @@ export const PostGenerator = () => {
     setStatus('Creating post...');
 
     try {
-      // Create a new post record with a temporary user_id (we'll use a UUID for demo)
-      const tempUserId = crypto.randomUUID();
-      
+      console.log('Creating new post with audio file:', audioFileName);
+
+      // Create a new post record for demo mode (user_id will be null)
       const { data: post, error } = await supabase
         .from('posts')
         .insert({
-          user_id: tempUserId,
           audio_file_name: audioFileName,
           status: 'generating'
         })
@@ -55,13 +54,14 @@ export const PostGenerator = () => {
         throw error;
       }
 
+      console.log('Post created successfully:', post);
       setPostId(post.id);
       setStatus('Generating content from audio...');
 
-      // Convert blob to FormData for proper file transmission
-      const formData = new FormData();
-      formData.append('audio', audioBlob, audioFileName);
-      formData.append('postId', post.id);
+      // Convert audio blob to base64 for transmission
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
 
       console.log('Calling generate-post function with postId:', post.id);
 
@@ -69,7 +69,7 @@ export const PostGenerator = () => {
       const { data, error: functionError } = await supabase.functions.invoke('generate-post', {
         body: {
           postId: post.id,
-          audioFile: audioBlob,
+          audioFile: base64Audio,
           audioFileName: audioFileName
         }
       });
@@ -81,7 +81,7 @@ export const PostGenerator = () => {
 
       console.log('Generate post response:', data);
 
-      if (data.success) {
+      if (data?.success && data?.content) {
         setGeneratedContent(data.content);
         setStatus('Content generated successfully!');
         
@@ -90,7 +90,7 @@ export const PostGenerator = () => {
           description: "Post content generated successfully!",
         });
       } else {
-        throw new Error(data.error || 'Failed to generate content');
+        throw new Error(data?.error || 'Failed to generate content');
       }
 
     } catch (error) {
@@ -134,7 +134,7 @@ export const PostGenerator = () => {
 
       console.log('Publish response:', data);
 
-      if (data.success) {
+      if (data?.success) {
         setStatus('Post published successfully!');
         
         toast({
@@ -142,16 +142,13 @@ export const PostGenerator = () => {
           description: "Post published to LinkedIn successfully!",
         });
 
-        // Update status
-        await supabase.functions.invoke('status-update', {
-          body: {
-            postId,
-            status: 'published',
-            linkedinPostId: data.linkedinPostId
-          }
-        });
+        // Clear the form for next use
+        setAudioBlob(null);
+        setAudioFileName('');
+        setGeneratedContent('');
+        setPostId(null);
       } else {
-        throw new Error(data.error || 'Failed to publish post');
+        throw new Error(data?.error || 'Failed to publish post');
       }
 
     } catch (error) {
@@ -169,6 +166,18 @@ export const PostGenerator = () => {
 
   return (
     <div className="space-y-6">
+      {/* Demo Mode Notice */}
+      <Card className="border-blue-200 bg-blue-50/50">
+        <CardContent className="pt-6">
+          <div className="flex items-center space-x-2 text-blue-700">
+            <AlertCircle className="h-5 w-5" />
+            <p className="text-sm">
+              <strong>Demo Mode:</strong> Posts are created without authentication for testing purposes.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Generate LinkedIn Post</CardTitle>
@@ -199,6 +208,8 @@ export const PostGenerator = () => {
               <p className="text-sm flex items-center gap-2">
                 {status.includes('successfully') ? (
                   <CheckCircle className="h-4 w-4 text-green-600" />
+                ) : status.includes('Failed') ? (
+                  <AlertCircle className="h-4 w-4 text-red-600" />
                 ) : (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 )}
