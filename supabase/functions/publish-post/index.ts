@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -26,10 +25,10 @@ serve(async (req) => {
 
     console.log('Publishing post for user:', userId)
 
-    // Get LinkedIn tokens for the user - include member_id
+    // Get LinkedIn tokens for the user - include both member IDs
     const { data: tokenData, error: tokenError } = await supabase
       .from('linkedin_tokens')
-      .select('access_token, expires_at, person_urn, member_id')
+      .select('access_token, expires_at, person_urn, member_id, legacy_member_id')
       .eq('user_id', userId)
       .single()
 
@@ -53,29 +52,32 @@ serve(async (req) => {
       .update({ status: 'publishing' })
       .eq('id', postId)
 
-    // Create the LinkedIn author URN - try member_id first, fallback to user ID
-    let linkedinAuthorUrn;
+    // Determine which member ID to use - prefer legacy if available, otherwise use current
+    let authorUrn;
+    let apiEndpoint = 'ugc'; // Default to UGC API
     
-    if (tokenData.member_id && tokenData.member_id !== userId) {
-      // Use actual LinkedIn member ID if available
-      linkedinAuthorUrn = `urn:li:member:${tokenData.member_id}`;
+    if (tokenData.legacy_member_id) {
+      // Use legacy numeric member ID with UGC API
+      authorUrn = `urn:li:member:${tokenData.legacy_member_id}`;
+      console.log('Using legacy member ID for UGC API:', tokenData.legacy_member_id);
     } else {
-      // Fallback: try to extract member ID from person_urn or use user ID
-      linkedinAuthorUrn = `urn:li:member:${userId}`;
-      console.log('Warning: Using fallback member ID for LinkedIn author URN');
+      // Use current member ID but try shares API instead
+      authorUrn = `urn:li:member:${tokenData.member_id}`;
+      apiEndpoint = 'shares'; // Try shares API for alphanumeric IDs
+      console.log('Using current member ID with shares API:', tokenData.member_id);
     }
-    
-    console.log('Using LinkedIn author URN:', linkedinAuthorUrn, 'from member_id:', tokenData.member_id)
 
-    // Call n8n webhook with post content, LinkedIn token, and correct author URN
+    // Call n8n webhook with the appropriate configuration
     const webhookData = {
       body: {
         postText: content,
         linkedinToken: tokenData.access_token,
-        linkedinAuthorUrn: linkedinAuthorUrn,
+        linkedinAuthorUrn: authorUrn,
+        apiEndpoint: apiEndpoint, // Tell n8n which API to use
         // Keep backward compatibility
         linkedin_person_urn: tokenData.person_urn,
-        linkedinMemberId: tokenData.member_id
+        linkedinMemberId: tokenData.member_id,
+        legacyMemberId: tokenData.legacy_member_id
       }
     }
 
@@ -84,8 +86,11 @@ serve(async (req) => {
       hasContent: !!content,
       hasLinkedinToken: !!tokenData.access_token,
       hasMemberId: !!tokenData.member_id,
+      hasLegacyMemberId: !!tokenData.legacy_member_id,
       memberId: tokenData.member_id,
-      linkedinAuthorUrn: linkedinAuthorUrn,
+      legacyMemberId: tokenData.legacy_member_id,
+      linkedinAuthorUrn: authorUrn,
+      apiEndpoint: apiEndpoint,
       webhookPayload: webhookData
     })
 
@@ -116,7 +121,8 @@ serve(async (req) => {
         JSON.stringify({ 
           success: true, 
           postUrl: linkedinPostUrl,
-          linkedinPostId: result.linkedinPostId || result.id
+          linkedinPostId: result.linkedinPostId || result.id,
+          usedApiEndpoint: apiEndpoint
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

@@ -22,8 +22,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Try to fetch LinkedIn member ID using the profile API
+    // Try to fetch LinkedIn member ID using multiple approaches
     let memberId = null;
+    let legacyMemberId = null;
     
     console.log('Fetching LinkedIn member ID...')
     
@@ -64,12 +65,41 @@ serve(async (req) => {
         const errorText = await profileResponse.text();
         console.error('Failed to fetch LinkedIn profile:', profileResponse.status, errorText);
       }
+
+      // Try to get legacy numeric member ID using the Legacy Profile API
+      if (memberId) {
+        console.log('Attempting to fetch legacy numeric member ID...');
+        
+        try {
+          const legacyResponse = await fetch(`https://api.linkedin.com/v2/people/(id:${memberId})?projection=(id)`, {
+            headers: {
+              'Authorization': `Bearer ${access_token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (legacyResponse.ok) {
+            const legacyData = await legacyResponse.json();
+            console.log('Legacy profile response:', legacyData);
+            
+            // Check if we got a different (potentially numeric) ID
+            if (legacyData.id && legacyData.id !== memberId) {
+              legacyMemberId = legacyData.id;
+              console.log('Found legacy member ID:', legacyMemberId);
+            }
+          } else {
+            console.log('Legacy profile API not accessible or failed:', legacyResponse.status);
+          }
+        } catch (legacyError) {
+          console.log('Legacy profile API error (this is expected):', legacyError.message);
+        }
+      }
+
     } catch (profileError) {
       console.error('Error fetching LinkedIn profile:', profileError);
     }
 
     // If we couldn't get the member ID from the API, generate a fallback
-    // This should not happen with proper scopes, but provides a backup
     if (!memberId) {
       console.log('Could not fetch member ID from LinkedIn API, using user ID as fallback');
       memberId = userId; // Use the Supabase user ID as fallback
@@ -78,7 +108,7 @@ serve(async (req) => {
     // Calculate expiration time
     const expiresAt = new Date(Date.now() + (expires_in * 1000))
 
-    // Save or update the LinkedIn tokens with member_id
+    // Save or update the LinkedIn tokens with both member IDs
     const { error } = await supabase
       .from('linkedin_tokens')
       .upsert({
@@ -88,6 +118,7 @@ serve(async (req) => {
         expires_at: expiresAt.toISOString(),
         person_urn: `urn:li:person:${userId}`,
         member_id: memberId,
+        legacy_member_id: legacyMemberId, // Store the legacy ID if we got one
         scope: scope
       })
 
@@ -96,10 +127,14 @@ serve(async (req) => {
       throw error
     }
 
-    console.log('LinkedIn tokens saved successfully with member_id:', memberId)
+    console.log('LinkedIn tokens saved successfully with member_id:', memberId, 'legacy_member_id:', legacyMemberId)
 
     return new Response(
-      JSON.stringify({ success: true, member_id: memberId }),
+      JSON.stringify({ 
+        success: true, 
+        member_id: memberId,
+        legacy_member_id: legacyMemberId 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
