@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,20 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Saving LinkedIn tokens for user:', session.user.id);
 
-      // Get LinkedIn profile info
-      const profileResponse = await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          'Authorization': `Bearer ${session.provider_token}`,
-        },
-      });
-
-      if (!profileResponse.ok) {
-        console.error('Failed to fetch LinkedIn profile');
-        return;
-      }
-
-      const profile = await profileResponse.json();
-      const personUrn = profile.id ? `urn:li:person:${profile.id}` : 'unknown';
+      // Use user ID as fallback for person_urn instead of calling LinkedIn API
+      const personUrn = `urn:li:person:${session.user.id}`;
 
       // Save tokens via edge function
       const { error } = await supabase.functions.invoke('save-linkedin-tokens', {
