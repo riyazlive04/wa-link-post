@@ -22,10 +22,38 @@ serve(async (req) => {
 
     console.log('Saving LinkedIn tokens for user:', userId)
 
+    // Fetch LinkedIn member ID using the People API
+    let memberId = null;
+    try {
+      console.log('Fetching LinkedIn member ID...')
+      const profileResponse = await fetch('https://api.linkedin.com/v2/people/(id~)', {
+        headers: {
+          'Authorization': `Bearer ${access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        // Extract numeric ID from the response
+        if (profileData.id) {
+          memberId = profileData.id;
+          console.log('Successfully fetched LinkedIn member ID:', memberId);
+        } else {
+          console.warn('No member ID found in LinkedIn profile response');
+        }
+      } else {
+        console.error('Failed to fetch LinkedIn profile:', profileResponse.status, await profileResponse.text());
+      }
+    } catch (error) {
+      console.error('Error fetching LinkedIn member ID:', error);
+      // Continue without member_id - we'll handle this in publish-post
+    }
+
     // Calculate expiration time
     const expiresAt = new Date(Date.now() + (expires_in * 1000)).toISOString()
 
-    // Upsert LinkedIn tokens
+    // Upsert LinkedIn tokens including member_id
     const { error } = await supabase
       .from('linkedin_tokens')
       .upsert({
@@ -34,6 +62,7 @@ serve(async (req) => {
         refresh_token: refresh_token,
         expires_at: expiresAt,
         person_urn: person_urn,
+        member_id: memberId,
         scope: scope,
         updated_at: new Date().toISOString()
       })
@@ -43,7 +72,7 @@ serve(async (req) => {
       throw error
     }
 
-    console.log('LinkedIn tokens saved successfully')
+    console.log('LinkedIn tokens saved successfully with member_id:', memberId)
 
     return new Response(
       JSON.stringify({ success: true }),

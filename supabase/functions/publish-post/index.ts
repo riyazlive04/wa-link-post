@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -26,10 +25,10 @@ serve(async (req) => {
 
     console.log('Publishing post for user:', userId)
 
-    // Get LinkedIn tokens for the user - include person_urn
+    // Get LinkedIn tokens for the user - include member_id
     const { data: tokenData, error: tokenError } = await supabase
       .from('linkedin_tokens')
-      .select('access_token, expires_at, person_urn')
+      .select('access_token, expires_at, person_urn, member_id')
       .eq('user_id', userId)
       .single()
 
@@ -38,16 +37,11 @@ serve(async (req) => {
       throw new Error('LinkedIn authentication required. Please connect your LinkedIn account.')
     }
 
-    // Validate person_urn exists
-    if (!tokenData.person_urn) {
-      console.error('No person_urn found for user:', userId)
-      throw new Error('LinkedIn person URN missing. Please reconnect your LinkedIn account.')
+    // Validate member_id exists (this is required for LinkedIn UGC API)
+    if (!tokenData.member_id) {
+      console.error('No member_id found for user:', userId)
+      throw new Error('LinkedIn member ID missing. Please reconnect your LinkedIn account to fetch your member ID.')
     }
-
-    // Extract numeric LinkedIn member ID from person_urn
-    const linkedinMemberId = tokenData.person_urn.replace('urn:li:person:', '')
-    
-    console.log('Extracted LinkedIn member ID:', linkedinMemberId, 'from person_urn:', tokenData.person_urn)
 
     // Check if token is expired
     const now = new Date()
@@ -64,13 +58,20 @@ serve(async (req) => {
       .update({ status: 'publishing' })
       .eq('id', postId)
 
-    // Call n8n webhook with post content, LinkedIn token, person_urn, and numeric member ID
+    // Create the correct LinkedIn author URN format using member_id
+    const linkedinAuthorUrn = `urn:li:member:${tokenData.member_id}`;
+    
+    console.log('Using LinkedIn author URN:', linkedinAuthorUrn, 'from member_id:', tokenData.member_id)
+
+    // Call n8n webhook with post content, LinkedIn token, and correct author URN
     const webhookData = {
       body: {
         postText: content,
         linkedinToken: tokenData.access_token,
+        linkedinAuthorUrn: linkedinAuthorUrn,
+        // Keep backward compatibility
         linkedin_person_urn: tokenData.person_urn,
-        linkedinMemberId: linkedinMemberId
+        linkedinMemberId: tokenData.member_id
       }
     }
 
@@ -78,9 +79,9 @@ serve(async (req) => {
       postId,
       hasContent: !!content,
       hasLinkedinToken: !!tokenData.access_token,
-      hasPersonUrn: !!tokenData.person_urn,
-      personUrn: tokenData.person_urn,
-      linkedinMemberId: linkedinMemberId,
+      hasMemberId: !!tokenData.member_id,
+      memberId: tokenData.member_id,
+      linkedinAuthorUrn: linkedinAuthorUrn,
       webhookPayload: webhookData
     })
 
