@@ -52,31 +52,36 @@ serve(async (req) => {
       .update({ status: 'publishing' })
       .eq('id', postId)
 
-    // Determine which member ID to use - prefer legacy if available, otherwise use current
+    // Determine which member ID to use and API endpoint
     let authorUrn;
     let apiEndpoint = 'ugc'; // Default to UGC API
+    let memberIdToUse = tokenData.member_id;
     
-    if (tokenData.legacy_member_id) {
-      // Use legacy numeric member ID with UGC API
+    // If we have a legacy numeric member ID, use it with UGC API
+    if (tokenData.legacy_member_id && tokenData.legacy_member_id !== null) {
       authorUrn = `urn:li:member:${tokenData.legacy_member_id}`;
+      memberIdToUse = tokenData.legacy_member_id;
+      apiEndpoint = 'ugc';
       console.log('Using legacy member ID for UGC API:', tokenData.legacy_member_id);
     } else {
-      // Use current member ID but try shares API instead
+      // Use current member ID with shares API for alphanumeric IDs
       authorUrn = `urn:li:member:${tokenData.member_id}`;
-      apiEndpoint = 'shares'; // Try shares API for alphanumeric IDs
+      memberIdToUse = tokenData.member_id;
+      apiEndpoint = 'shares';
       console.log('Using current member ID with shares API:', tokenData.member_id);
     }
 
-    // Prepare webhook payload
+    // Prepare webhook payload - ensure we don't send null values
     const webhookPayload = {
       postText: content,
       linkedinToken: tokenData.access_token,
       linkedinAuthorUrn: authorUrn,
       apiEndpoint: apiEndpoint,
+      memberIdToUse: memberIdToUse, // Always provide a valid member ID
       // Keep backward compatibility
       linkedin_person_urn: tokenData.person_urn,
       linkedinMemberId: tokenData.member_id,
-      legacyMemberId: tokenData.legacy_member_id
+      legacyMemberId: tokenData.legacy_member_id || undefined // Send undefined instead of null
     }
 
     console.log('Calling n8n publish webhook with payload:', {
@@ -84,9 +89,10 @@ serve(async (req) => {
       hasContent: !!content,
       hasLinkedinToken: !!tokenData.access_token,
       hasMemberId: !!tokenData.member_id,
-      hasLegacyMemberId: !!tokenData.legacy_member_id,
+      hasLegacyMemberId: !!(tokenData.legacy_member_id && tokenData.legacy_member_id !== null),
       memberId: tokenData.member_id,
       legacyMemberId: tokenData.legacy_member_id,
+      memberIdToUse: memberIdToUse,
       linkedinAuthorUrn: authorUrn,
       apiEndpoint: apiEndpoint
     })
