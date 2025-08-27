@@ -62,7 +62,8 @@ serve(async (req) => {
       postId,
       hasContent: !!content,
       hasLinkedinToken: !!tokenData.access_token,
-      hasPersonUrn: !!tokenData.person_urn
+      hasPersonUrn: !!tokenData.person_urn,
+      personUrn: tokenData.person_urn
     })
 
     const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
