@@ -120,21 +120,42 @@ export const PostGenerator = () => {
     setStatus('Publishing to LinkedIn...');
 
     try {
-      console.log('Publishing post with ID:', postId);
+      console.log('Publishing post with content:', generatedContent);
 
-      // Call the publish-post edge function
-      const { data, error } = await supabase.functions.invoke('publish-post', {
-        body: { postId }
+      // Update post status to publishing
+      await supabase
+        .from('posts')
+        .update({ status: 'publishing' })
+        .eq('id', postId);
+
+      // Call n8n webhook directly
+      const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          payload: {
+            postText: generatedContent,
+            media: null
+          },
+          callbackUrl: "https://lovable.app/your-cb-if-you-use-callback"
+        })
       });
 
-      if (error) {
-        console.error('Publish error:', error);
-        throw error;
-      }
+      const result = await response.json();
+      console.log('n8n webhook response:', result);
 
-      console.log('Publish response:', data);
+      if (response.ok && result.success) {
+        // Update post with LinkedIn post URL and status
+        await supabase
+          .from('posts')
+          .update({ 
+            linkedin_post_id: result.postUrl || 'published',
+            status: 'published'
+          })
+          .eq('id', postId);
 
-      if (data?.success) {
         setStatus('Post published successfully!');
         
         toast({
@@ -148,11 +169,18 @@ export const PostGenerator = () => {
         setGeneratedContent('');
         setPostId(null);
       } else {
-        throw new Error(data?.error || 'Failed to publish post');
+        throw new Error(result?.error || 'Failed to publish post to LinkedIn');
       }
 
     } catch (error) {
       console.error('Error publishing post:', error);
+      
+      // Update status to failed
+      await supabase
+        .from('posts')
+        .update({ status: 'failed' })
+        .eq('id', postId);
+      
       setStatus('Failed to publish post');
       toast({
         title: "Error",
