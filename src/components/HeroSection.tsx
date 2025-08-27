@@ -36,7 +36,7 @@ export const HeroSection = () => {
           </div>
 
           <h1 className="heading-display mb-8 bg-gradient-to-r from-foreground via-primary to-accent bg-clip-text text-transparent animate-slide-up">
-            Transform WhatsApp Messages into
+            Transform Your Voice Message into
             <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-pulse">
               Professional LinkedIn Posts
             </span>
