@@ -1,56 +1,99 @@
 
 import { Clock, ExternalLink, Heart, MessageCircle, Share2, Sparkles, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 
 interface Post {
   id: string;
   content: string;
-  timestamp: string;
-  engagement: {
-    likes: number;
-    comments: number;
-    shares: number;
-  };
-  status: 'published' | 'processing' | 'failed';
+  created_at: string;
+  status: 'generating' | 'generated' | 'publishing' | 'published' | 'failed';
+  linkedin_post_id?: string;
 }
 
 export const RecentPosts = () => {
-  const recentPosts: Post[] = [
-    {
-      id: "1",
-      content: "Just finished an amazing project using React and TypeScript. The development experience was incredibly smooth, and the type safety really helped catch potential bugs early in the process...",
-      timestamp: "2 hours ago",
-      engagement: { likes: 24, comments: 8, shares: 3 },
-      status: 'published'
-    },
-    {
-      id: "2", 
-      content: "Excited to share some insights about the future of AI in business automation. The possibilities are endless when we combine human creativity with AI efficiency...",
-      timestamp: "1 day ago",
-      engagement: { likes: 56, comments: 12, shares: 8 },
-      status: 'published'
-    },
-    {
-      id: "3",
-      content: "Reflecting on the importance of continuous learning in tech. Every day brings new challenges and opportunities to grow...",
-      timestamp: "2 days ago", 
-      engagement: { likes: 31, comments: 5, shares: 2 },
-      status: 'published'
+  const { data: posts, isLoading, refetch } = useQuery({
+    queryKey: ['recent-posts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      return data as Post[];
     }
-  ];
+  });
+
+  // Set up real-time subscription for posts
+  useEffect(() => {
+    const channel = supabase
+      .channel('posts-changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'posts' 
+        }, 
+        () => {
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
 
   const getStatusColor = (status: Post['status']) => {
     switch (status) {
       case 'published': return 'status-success';
-      case 'processing': return 'status-warning'; 
+      case 'generating': case 'publishing': return 'status-warning'; 
       case 'failed': return 'status-error';
       default: return 'bg-muted';
     }
   };
 
-  const getTotalEngagement = (engagement: Post['engagement']) => {
-    return engagement.likes + engagement.comments + engagement.shares;
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    return `${Math.floor(diffInHours / 24)} days ago`;
   };
+
+  const getEngagementData = () => {
+    // Mock engagement data for now - in real app this would come from LinkedIn API
+    return {
+      likes: Math.floor(Math.random() * 100),
+      comments: Math.floor(Math.random() * 20),
+      shares: Math.floor(Math.random() * 10)
+    };
+  };
+
+  if (isLoading) {
+    return (
+      <section className="section-spacing bg-gradient-to-br from-background via-muted/20 to-accent/5">
+        <div className="container-professional">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-muted rounded w-1/3"></div>
+            <div className="h-4 bg-muted rounded w-1/2"></div>
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-32 bg-muted rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="section-spacing bg-gradient-to-br from-background via-muted/20 to-accent/5 relative">
@@ -77,69 +120,85 @@ export const RecentPosts = () => {
           </Button>
         </div>
 
-        <div className="space-y-8">
-          {recentPosts.map((post, index) => (
-            <div 
-              key={post.id} 
-              className="group relative card-elevated p-8 animate-slide-up hover-lift bg-gradient-to-br from-card/80 to-primary/5 backdrop-blur-sm border-l-4 border-l-primary/50 hover:border-l-primary transition-all duration-300"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              {/* Floating engagement indicator */}
-              <div className="absolute top-4 right-4 flex items-center space-x-1 px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
-                <TrendingUp className="h-3 w-3 text-primary" />
-                <span className="text-xs font-medium text-primary">
-                  {getTotalEngagement(post.engagement)} interactions
-                </span>
-              </div>
+        {posts && posts.length > 0 ? (
+          <div className="space-y-8">
+            {posts.map((post, index) => {
+              const engagement = getEngagementData();
+              const totalEngagement = engagement.likes + engagement.comments + engagement.shares;
+              
+              return (
+                <div 
+                  key={post.id} 
+                  className="group relative card-elevated p-8 animate-slide-up hover-lift bg-gradient-to-br from-card/80 to-primary/5 backdrop-blur-sm border-l-4 border-l-primary/50 hover:border-l-primary transition-all duration-300"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <div className="absolute top-4 right-4 flex items-center space-x-1 px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
+                    <TrendingUp className="h-3 w-3 text-primary" />
+                    <span className="text-xs font-medium text-primary">
+                      {totalEngagement} interactions
+                    </span>
+                  </div>
 
-              <div className="flex justify-between items-start mb-6">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <div className={`w-4 h-4 rounded-full ${getStatusColor(post.status)} animate-pulse`}></div>
-                    {post.status === 'published' && (
-                      <div className="absolute -top-1 -right-1">
-                        <Sparkles className="h-3 w-3 text-success animate-pulse" />
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center space-x-4">
+                      <div className="relative">
+                        <div className={`w-4 h-4 rounded-full ${getStatusColor(post.status)} animate-pulse`}></div>
+                        {post.status === 'published' && (
+                          <div className="absolute -top-1 -right-1">
+                            <Sparkles className="h-3 w-3 text-success animate-pulse" />
+                          </div>
+                        )}
                       </div>
+                      <span className={`body-small font-medium capitalize px-3 py-1 rounded-full border ${
+                        post.status === 'published' ? 'bg-success/10 text-success border-success/20' :
+                        post.status === 'failed' ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                        'bg-warning/10 text-warning border-warning/20'
+                      }`}>
+                        {post.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span className="body-small">{formatTimeAgo(post.created_at)}</span>
+                    </div>
+                  </div>
+
+                  <p className="body-medium mb-8 leading-relaxed group-hover:text-foreground transition-colors">
+                    {post.content || 'Content is being generated...'}
+                  </p>
+
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-8">
+                      <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors group/stat">
+                        <Heart className="h-4 w-4 text-red-500 group-hover/stat:animate-pulse" />
+                        <span className="body-small font-medium">{engagement.likes}</span>
+                      </div>
+                      <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-accent/5 hover:bg-accent/10 transition-colors group/stat">
+                        <MessageCircle className="h-4 w-4 text-accent group-hover/stat:animate-bounce" />
+                        <span className="body-small font-medium">{engagement.comments}</span>
+                      </div>
+                      <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-success/5 hover:bg-success/10 transition-colors group/stat">
+                        <Share2 className="h-4 w-4 text-success group-hover/stat:animate-pulse" />
+                        <span className="body-small font-medium">{engagement.shares}</span>
+                      </div>
+                    </div>
+
+                    {post.linkedin_post_id && (
+                      <Button variant="ghost" size="sm" className="text-primary hover:text-primary-hover group/btn border border-primary/20 hover:border-primary/40">
+                        <ExternalLink className="h-4 w-4 mr-2 group-hover/btn:rotate-12 transition-transform" />
+                        View on LinkedIn
+                      </Button>
                     )}
                   </div>
-                  <span className="body-small font-medium capitalize px-3 py-1 bg-success/10 text-success rounded-full border border-success/20">
-                    {post.status}
-                  </span>
                 </div>
-                <div className="flex items-center space-x-2 text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span className="body-small">{post.timestamp}</span>
-                </div>
-              </div>
-
-              <p className="body-medium mb-8 leading-relaxed group-hover:text-foreground transition-colors">
-                {post.content}
-              </p>
-
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-8">
-                  <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors group/stat">
-                    <Heart className="h-4 w-4 text-red-500 group-hover/stat:animate-pulse" />
-                    <span className="body-small font-medium">{post.engagement.likes}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-accent/5 hover:bg-accent/10 transition-colors group/stat">
-                    <MessageCircle className="h-4 w-4 text-accent group-hover/stat:animate-bounce" />
-                    <span className="body-small font-medium">{post.engagement.comments}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-success/5 hover:bg-success/10 transition-colors group/stat">
-                    <Share2 className="h-4 w-4 text-success group-hover/stat:animate-pulse" />
-                    <span className="body-small font-medium">{post.engagement.shares}</span>
-                  </div>
-                </div>
-
-                <Button variant="ghost" size="sm" className="text-primary hover:text-primary-hover group/btn border border-primary/20 hover:border-primary/40">
-                  <ExternalLink className="h-4 w-4 mr-2 group-hover/btn:rotate-12 transition-transform" />
-                  View on LinkedIn
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No posts yet. Create your first post above!</p>
+          </div>
+        )}
       </div>
     </section>
   );
