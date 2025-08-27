@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,9 +63,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Saving LinkedIn tokens for user:', session.user.id);
 
-      // Use user ID as fallback for person_urn instead of calling LinkedIn API
-      const personUrn = `urn:li:person:${session.user.id}`;
-
       // Save tokens via edge function
       const { error } = await supabase.functions.invoke('save-linkedin-tokens', {
         body: {
@@ -72,7 +70,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           access_token: session.provider_token,
           refresh_token: session.provider_refresh_token,
           expires_in: 3600, // LinkedIn typically gives 60 days, but we'll refresh more frequently
-          person_urn: personUrn,
           scope: 'openid profile w_member_social'
         }
       });
@@ -92,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       provider: 'linkedin_oidc',
       options: {
         redirectTo: `${window.location.origin}/`,
-        scopes: 'openid profile w_member_social'
+        scopes: 'openid profile email w_member_social'
       }
     });
 

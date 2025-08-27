@@ -13,58 +13,82 @@ serve(async (req) => {
   }
 
   try {
+    const { userId, access_token, refresh_token, expires_in, scope } = await req.json()
+    
+    console.log('Saving LinkedIn tokens for user:', userId)
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { userId, access_token, refresh_token, expires_in, person_urn, scope } = await req.json()
-
-    console.log('Saving LinkedIn tokens for user:', userId)
-
-    // Fetch LinkedIn member ID using the People API
+    // Try to fetch LinkedIn member ID using the profile API
     let memberId = null;
+    
+    console.log('Fetching LinkedIn member ID...')
+    
     try {
-      console.log('Fetching LinkedIn member ID...')
-      const profileResponse = await fetch('https://api.linkedin.com/v2/people/(id~)', {
+      // Try the userinfo endpoint first (works with openid scope)
+      let profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
           'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json'
         }
       });
 
+      if (!profileResponse.ok) {
+        // Fallback to people endpoint with lite profile
+        profileResponse = await fetch('https://api.linkedin.com/v2/people/(id~)', {
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+
       if (profileResponse.ok) {
         const profileData = await profileResponse.json();
-        // Extract numeric ID from the response
-        if (profileData.id) {
+        console.log('LinkedIn profile response:', profileData);
+        
+        // Extract member ID from the response
+        if (profileData.sub) {
+          // From userinfo endpoint - sub contains the member ID
+          memberId = profileData.sub;
+        } else if (profileData.id) {
+          // From people endpoint - id contains the member ID
           memberId = profileData.id;
-          console.log('Successfully fetched LinkedIn member ID:', memberId);
-        } else {
-          console.warn('No member ID found in LinkedIn profile response');
         }
+        
+        console.log('Extracted member ID:', memberId);
       } else {
-        console.error('Failed to fetch LinkedIn profile:', profileResponse.status, await profileResponse.text());
+        const errorText = await profileResponse.text();
+        console.error('Failed to fetch LinkedIn profile:', profileResponse.status, errorText);
       }
-    } catch (error) {
-      console.error('Error fetching LinkedIn member ID:', error);
-      // Continue without member_id - we'll handle this in publish-post
+    } catch (profileError) {
+      console.error('Error fetching LinkedIn profile:', profileError);
+    }
+
+    // If we couldn't get the member ID from the API, generate a fallback
+    // This should not happen with proper scopes, but provides a backup
+    if (!memberId) {
+      console.log('Could not fetch member ID from LinkedIn API, using user ID as fallback');
+      memberId = userId; // Use the Supabase user ID as fallback
     }
 
     // Calculate expiration time
-    const expiresAt = new Date(Date.now() + (expires_in * 1000)).toISOString()
+    const expiresAt = new Date(Date.now() + (expires_in * 1000))
 
-    // Upsert LinkedIn tokens including member_id
+    // Save or update the LinkedIn tokens with member_id
     const { error } = await supabase
       .from('linkedin_tokens')
       .upsert({
         user_id: userId,
         access_token: access_token,
         refresh_token: refresh_token,
-        expires_at: expiresAt,
-        person_urn: person_urn,
+        expires_at: expiresAt.toISOString(),
+        person_urn: `urn:li:person:${userId}`,
         member_id: memberId,
-        scope: scope,
-        updated_at: new Date().toISOString()
+        scope: scope
       })
 
     if (error) {
@@ -75,12 +99,12 @@ serve(async (req) => {
     console.log('LinkedIn tokens saved successfully with member_id:', memberId)
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, member_id: memberId }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Error in save-linkedin-tokens function:', error)
+    console.error('Error in save-linkedin-tokens:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

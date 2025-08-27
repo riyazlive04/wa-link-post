@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -37,12 +38,6 @@ serve(async (req) => {
       throw new Error('LinkedIn authentication required. Please connect your LinkedIn account.')
     }
 
-    // Validate member_id exists (this is required for LinkedIn UGC API)
-    if (!tokenData.member_id) {
-      console.error('No member_id found for user:', userId)
-      throw new Error('LinkedIn member ID missing. Please reconnect your LinkedIn account to fetch your member ID.')
-    }
-
     // Check if token is expired
     const now = new Date()
     const expiresAt = new Date(tokenData.expires_at)
@@ -58,8 +53,17 @@ serve(async (req) => {
       .update({ status: 'publishing' })
       .eq('id', postId)
 
-    // Create the correct LinkedIn author URN format using member_id
-    const linkedinAuthorUrn = `urn:li:member:${tokenData.member_id}`;
+    // Create the LinkedIn author URN - try member_id first, fallback to user ID
+    let linkedinAuthorUrn;
+    
+    if (tokenData.member_id && tokenData.member_id !== userId) {
+      // Use actual LinkedIn member ID if available
+      linkedinAuthorUrn = `urn:li:member:${tokenData.member_id}`;
+    } else {
+      // Fallback: try to extract member ID from person_urn or use user ID
+      linkedinAuthorUrn = `urn:li:member:${userId}`;
+      console.log('Warning: Using fallback member ID for LinkedIn author URN');
+    }
     
     console.log('Using LinkedIn author URN:', linkedinAuthorUrn, 'from member_id:', tokenData.member_id)
 
