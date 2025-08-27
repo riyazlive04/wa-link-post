@@ -1,10 +1,8 @@
-
 import { Clock, ExternalLink, Heart, MessageCircle, Share2, Sparkles, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
-
 interface Post {
   id: string;
   content: string;
@@ -12,17 +10,20 @@ interface Post {
   status: 'generating' | 'generated' | 'publishing' | 'published' | 'failed';
   linkedin_post_id?: string;
 }
-
 export const RecentPosts = () => {
-  const { data: posts, isLoading, refetch } = useQuery({
+  const {
+    data: posts,
+    isLoading,
+    refetch
+  } = useQuery({
     queryKey: ['recent-posts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
+      const {
+        data,
+        error
+      } = await supabase.from('posts').select('*').order('created_at', {
+        ascending: false
+      }).limit(10);
       if (error) throw error;
       return data as Post[];
     }
@@ -30,44 +31,38 @@ export const RecentPosts = () => {
 
   // Set up real-time subscription for posts
   useEffect(() => {
-    const channel = supabase
-      .channel('posts-changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'posts' 
-        }, 
-        () => {
-          refetch();
-        }
-      )
-      .subscribe();
-
+    const channel = supabase.channel('posts-changes').on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'posts'
+    }, () => {
+      refetch();
+    }).subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [refetch]);
-
   const getStatusColor = (status: Post['status']) => {
     switch (status) {
-      case 'published': return 'status-success';
-      case 'generating': case 'publishing': return 'status-warning'; 
-      case 'failed': return 'status-error';
-      default: return 'bg-muted';
+      case 'published':
+        return 'status-success';
+      case 'generating':
+      case 'publishing':
+        return 'status-warning';
+      case 'failed':
+        return 'status-error';
+      default:
+        return 'bg-muted';
     }
   };
-
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
     if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${diffInHours} hours ago`;
     return `${Math.floor(diffInHours / 24)} days ago`;
   };
-
   const getEngagementData = () => {
     // Mock engagement data for now - in real app this would come from LinkedIn API
     return {
@@ -76,27 +71,20 @@ export const RecentPosts = () => {
       shares: Math.floor(Math.random() * 10)
     };
   };
-
   if (isLoading) {
-    return (
-      <section className="section-spacing bg-gradient-to-br from-background via-muted/20 to-accent/5">
+    return <section className="section-spacing bg-gradient-to-br from-background via-muted/20 to-accent/5">
         <div className="container-professional">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-muted rounded w-1/3"></div>
             <div className="h-4 bg-muted rounded w-1/2"></div>
             <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-32 bg-muted rounded"></div>
-              ))}
+              {[1, 2, 3].map(i => <div key={i} className="h-32 bg-muted rounded"></div>)}
             </div>
           </div>
         </div>
-      </section>
-    );
+      </section>;
   }
-
-  return (
-    <section className="section-spacing bg-gradient-to-br from-background via-muted/20 to-accent/5 relative">
+  return <section className="section-spacing bg-gradient-to-br from-background via-muted/20 to-accent/5 relative">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl"></div>
@@ -112,7 +100,7 @@ export const RecentPosts = () => {
                 Recent Posts
               </h2>
             </div>
-            <p className="body-large">Your latest LinkedIn posts created via WhatsApp magic ✨</p>
+            <p className="body-large">Your latest LinkedIn posts created via Voice magic ✨</p>
           </div>
           <Button variant="outline" className="btn-professional group border-2 border-primary/30 hover:border-primary/60">
             <Sparkles className="mr-2 h-4 w-4 group-hover:animate-spin" />
@@ -120,18 +108,13 @@ export const RecentPosts = () => {
           </Button>
         </div>
 
-        {posts && posts.length > 0 ? (
-          <div className="space-y-8">
+        {posts && posts.length > 0 ? <div className="space-y-8">
             {posts.map((post, index) => {
-              const engagement = getEngagementData();
-              const totalEngagement = engagement.likes + engagement.comments + engagement.shares;
-              
-              return (
-                <div 
-                  key={post.id} 
-                  className="group relative card-elevated p-8 animate-slide-up hover-lift bg-gradient-to-br from-card/80 to-primary/5 backdrop-blur-sm border-l-4 border-l-primary/50 hover:border-l-primary transition-all duration-300"
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
+          const engagement = getEngagementData();
+          const totalEngagement = engagement.likes + engagement.comments + engagement.shares;
+          return <div key={post.id} className="group relative card-elevated p-8 animate-slide-up hover-lift bg-gradient-to-br from-card/80 to-primary/5 backdrop-blur-sm border-l-4 border-l-primary/50 hover:border-l-primary transition-all duration-300" style={{
+            animationDelay: `${index * 0.1}s`
+          }}>
                   <div className="absolute top-4 right-4 flex items-center space-x-1 px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
                     <TrendingUp className="h-3 w-3 text-primary" />
                     <span className="text-xs font-medium text-primary">
@@ -143,17 +126,11 @@ export const RecentPosts = () => {
                     <div className="flex items-center space-x-4">
                       <div className="relative">
                         <div className={`w-4 h-4 rounded-full ${getStatusColor(post.status)} animate-pulse`}></div>
-                        {post.status === 'published' && (
-                          <div className="absolute -top-1 -right-1">
+                        {post.status === 'published' && <div className="absolute -top-1 -right-1">
                             <Sparkles className="h-3 w-3 text-success animate-pulse" />
-                          </div>
-                        )}
+                          </div>}
                       </div>
-                      <span className={`body-small font-medium capitalize px-3 py-1 rounded-full border ${
-                        post.status === 'published' ? 'bg-success/10 text-success border-success/20' :
-                        post.status === 'failed' ? 'bg-destructive/10 text-destructive border-destructive/20' :
-                        'bg-warning/10 text-warning border-warning/20'
-                      }`}>
+                      <span className={`body-small font-medium capitalize px-3 py-1 rounded-full border ${post.status === 'published' ? 'bg-success/10 text-success border-success/20' : post.status === 'failed' ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-warning/10 text-warning border-warning/20'}`}>
                         {post.status}
                       </span>
                     </div>
@@ -183,23 +160,16 @@ export const RecentPosts = () => {
                       </div>
                     </div>
 
-                    {post.linkedin_post_id && (
-                      <Button variant="ghost" size="sm" className="text-primary hover:text-primary-hover group/btn border border-primary/20 hover:border-primary/40">
+                    {post.linkedin_post_id && <Button variant="ghost" size="sm" className="text-primary hover:text-primary-hover group/btn border border-primary/20 hover:border-primary/40">
                         <ExternalLink className="h-4 w-4 mr-2 group-hover/btn:rotate-12 transition-transform" />
                         View on LinkedIn
-                      </Button>
-                    )}
+                      </Button>}
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-12">
+                </div>;
+        })}
+          </div> : <div className="text-center py-12">
             <p className="text-muted-foreground">No posts yet. Create your first post above!</p>
-          </div>
-        )}
+          </div>}
       </div>
-    </section>
-  );
+    </section>;
 };
