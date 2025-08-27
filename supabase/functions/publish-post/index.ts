@@ -12,13 +12,17 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let requestBody: any = null;
+  
   try {
+    requestBody = await req.json()
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { userId, postId, content } = await req.json()
+    const { userId, postId, content } = requestBody
 
     console.log('Publishing post for user:', userId)
 
@@ -32,6 +36,12 @@ serve(async (req) => {
     if (tokenError || !tokenData) {
       console.error('No LinkedIn tokens found for user:', userId)
       throw new Error('LinkedIn authentication required. Please connect your LinkedIn account.')
+    }
+
+    // Validate person_urn exists
+    if (!tokenData.person_urn) {
+      console.error('No person_urn found for user:', userId)
+      throw new Error('LinkedIn person URN missing. Please reconnect your LinkedIn account.')
     }
 
     // Check if token is expired
@@ -63,7 +73,8 @@ serve(async (req) => {
       hasContent: !!content,
       hasLinkedinToken: !!tokenData.access_token,
       hasPersonUrn: !!tokenData.person_urn,
-      personUrn: tokenData.person_urn
+      personUrn: tokenData.person_urn,
+      webhookPayload: webhookData
     })
 
     const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
@@ -106,9 +117,8 @@ serve(async (req) => {
     console.error('Error publishing post:', error)
     
     // Update status to failed if we have the necessary data
-    try {
-      const requestData = await req.json()
-      if (requestData.postId) {
+    if (requestBody?.postId) {
+      try {
         const supabase = createClient(
           Deno.env.get('SUPABASE_URL') ?? '',
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -117,10 +127,10 @@ serve(async (req) => {
         await supabase
           .from('posts')
           .update({ status: 'failed' })
-          .eq('id', requestData.postId)
+          .eq('id', requestBody.postId)
+      } catch (updateError) {
+        console.error('Error updating failed status:', updateError)
       }
-    } catch (updateError) {
-      console.error('Error updating failed status:', updateError)
     }
 
     return new Response(
