@@ -62,7 +62,7 @@ export const DashboardCard = ({
         </div>
         
         <div className="space-y-3">
-          <h3 className="heading-small group-hover:text-primary transition-colors">Voice Messages</h3>
+          <h3 className="heading-small group-hover:text-primary transition-colors">{title}</h3>
           <p className="body-small">{description}</p>
           {value && (
             <p className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">

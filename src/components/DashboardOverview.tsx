@@ -29,7 +29,7 @@ export const DashboardOverview = () => {
       gradient: "from-success/10 to-primary/10"
     },
     {
-      title: "Active Days",
+      title: "Voice Messages",
       description: "Days with posts this month",
       icon: Calendar,
       value: "18",
