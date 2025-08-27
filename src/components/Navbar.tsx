@@ -1,8 +1,39 @@
 
-import { Linkedin, MessageSquare, Settings, BarChart3, Sparkles, Bot } from "lucide-react";
+import { Linkedin, Settings, BarChart3, Sparkles, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export const Navbar = () => {
+  const { toast } = useToast();
+
+  const handleLinkedInLogin = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'linkedin_oidc',
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (error) {
+        console.error('LinkedIn login error:', error);
+        toast({
+          title: "Login Error",
+          description: "Failed to connect to LinkedIn. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error('LinkedIn login error:', err);
+      toast({
+        title: "Login Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <nav className="border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 shadow-lg">
       <div className="container-professional">
@@ -18,7 +49,7 @@ export const Navbar = () => {
               <div>
                 <div className="flex items-center space-x-2">
                   <h1 className="font-bold text-xl bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    PostAI
+                    LinkedIn Post Agent
                   </h1>
                   <Sparkles className="h-4 w-4 text-accent animate-pulse" />
                 </div>
@@ -28,18 +59,14 @@ export const Navbar = () => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover:bg-primary/10 border border-transparent hover:border-primary/20 transition-all duration-200">
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">WhatsApp</span>
-              <div className="relative">
-                <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                <div className="absolute inset-0 w-2 h-2 bg-success rounded-full animate-ping"></div>
-              </div>
-            </Button>
-            
-            <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover:bg-primary/10 border border-transparent hover:border-primary/20 transition-all duration-200">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="flex items-center space-x-2 hover:bg-primary/10 border border-transparent hover:border-primary/20 transition-all duration-200"
+              onClick={handleLinkedInLogin}
+            >
               <Linkedin className="h-4 w-4" />
-              <span className="hidden sm:inline">LinkedIn</span>
+              <span className="hidden sm:inline">Connect LinkedIn</span>
               <div className="relative">
                 <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
                 <div className="absolute inset-0 w-2 h-2 bg-success rounded-full animate-ping"></div>

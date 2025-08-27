@@ -1,4 +1,3 @@
-
 import { MessageSquare, Linkedin, Zap, ArrowRight, Sparkles, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,7 +42,7 @@ export const HeroSection = () => {
           </h1>
 
           <p className="body-large mb-10 max-w-2xl mx-auto animate-slide-up leading-relaxed" style={{ animationDelay: '0.2s' }}>
-            Send a simple WhatsApp message and watch as AI transforms your thoughts 
+            Send a simple Voice message and watch as AI transforms your thoughts 
             into engaging, professional LinkedIn content that gets published automatically.
             <span className="block mt-2 text-primary font-medium">✨ It's like magic, but for LinkedIn!</span>
           </p>
