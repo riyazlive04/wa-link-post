@@ -22,10 +22,10 @@ serve(async (req) => {
 
     console.log('Publishing post for user:', userId)
 
-    // Get LinkedIn tokens for the user
+    // Get LinkedIn tokens for the user - include person_urn
     const { data: tokenData, error: tokenError } = await supabase
       .from('linkedin_tokens')
-      .select('access_token, expires_at')
+      .select('access_token, expires_at, person_urn')
       .eq('user_id', userId)
       .single()
 
@@ -49,18 +49,20 @@ serve(async (req) => {
       .update({ status: 'publishing' })
       .eq('id', postId)
 
-    // Call n8n webhook with post content and LinkedIn token
+    // Call n8n webhook with post content, LinkedIn token, and person_urn
     const webhookData = {
       body: {
         postText: content,
-        linkedinToken: tokenData.access_token
+        linkedinToken: tokenData.access_token,
+        linkedin_person_urn: tokenData.person_urn
       }
     }
 
     console.log('Calling n8n publish webhook with data:', {
       postId,
       hasContent: !!content,
-      hasLinkedinToken: !!tokenData.access_token
+      hasLinkedinToken: !!tokenData.access_token,
+      hasPersonUrn: !!tokenData.person_urn
     })
 
     const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
