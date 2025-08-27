@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
+
 interface Post {
   id: string;
   content: string;
@@ -10,6 +11,7 @@ interface Post {
   status: 'generating' | 'generated' | 'publishing' | 'published' | 'failed';
   linkedin_post_id?: string;
 }
+
 export const RecentPosts = () => {
   const {
     data: posts,
@@ -42,6 +44,7 @@ export const RecentPosts = () => {
       supabase.removeChannel(channel);
     };
   }, [refetch]);
+
   const getStatusColor = (status: Post['status']) => {
     switch (status) {
       case 'published':
@@ -55,6 +58,7 @@ export const RecentPosts = () => {
         return 'bg-muted';
     }
   };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -63,6 +67,7 @@ export const RecentPosts = () => {
     if (diffInHours < 24) return `${diffInHours} hours ago`;
     return `${Math.floor(diffInHours / 24)} days ago`;
   };
+
   const getEngagementData = () => {
     // Mock engagement data for now - in real app this would come from LinkedIn API
     return {
@@ -71,6 +76,31 @@ export const RecentPosts = () => {
       shares: Math.floor(Math.random() * 10)
     };
   };
+
+  const handleViewOnLinkedIn = (linkedinPostId: string) => {
+    if (!linkedinPostId || linkedinPostId === 'published') {
+      console.warn('Invalid LinkedIn post URL:', linkedinPostId);
+      return;
+    }
+
+    try {
+      // Check if it's already a full URL
+      const url = linkedinPostId.startsWith('http') 
+        ? linkedinPostId 
+        : `https://www.linkedin.com/posts/${linkedinPostId}`;
+      
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Error opening LinkedIn post:', error);
+    }
+  };
+
+  const isValidLinkedInUrl = (linkedinPostId?: string) => {
+    return linkedinPostId && 
+           linkedinPostId !== 'published' && 
+           linkedinPostId.trim().length > 0;
+  };
+
   if (isLoading) {
     return <section className="section-spacing bg-gradient-to-br from-background via-muted/20 to-accent/5">
         <div className="container-professional">
@@ -84,6 +114,7 @@ export const RecentPosts = () => {
         </div>
       </section>;
   }
+
   return <section className="section-spacing bg-gradient-to-br from-background via-muted/20 to-accent/5 relative">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
@@ -160,10 +191,17 @@ export const RecentPosts = () => {
                       </div>
                     </div>
 
-                    {post.linkedin_post_id && <Button variant="ghost" size="sm" className="text-primary hover:text-primary-hover group/btn border border-primary/20 hover:border-primary/40">
+                    {isValidLinkedInUrl(post.linkedin_post_id) && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-primary hover:text-primary-hover group/btn border border-primary/20 hover:border-primary/40"
+                        onClick={() => handleViewOnLinkedIn(post.linkedin_post_id!)}
+                      >
                         <ExternalLink className="h-4 w-4 mr-2 group-hover/btn:rotate-12 transition-transform" />
                         View on LinkedIn
-                      </Button>}
+                      </Button>
+                    )}
                   </div>
                 </div>;
         })}

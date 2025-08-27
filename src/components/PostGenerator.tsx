@@ -147,11 +147,13 @@ export const PostGenerator = () => {
       console.log('n8n webhook response:', result);
 
       if (response.ok && result.success) {
-        // Update post with LinkedIn post URL and status
+        // Store the actual LinkedIn post URL instead of just 'published'
+        const linkedinPostUrl = result.postUrl || result.linkedinPostUrl || result.url;
+        
         await supabase
           .from('posts')
           .update({ 
-            linkedin_post_id: result.postUrl || 'published',
+            linkedin_post_id: linkedinPostUrl || 'published',
             status: 'published'
           })
           .eq('id', postId);
