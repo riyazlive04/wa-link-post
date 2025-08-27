@@ -40,6 +40,3 @@ export const LanguageSelector = ({ value, onChange, disabled }: LanguageSelector
     </div>
   );
 };
-</LanguageSelector>
-
-export default LanguageSelector;
