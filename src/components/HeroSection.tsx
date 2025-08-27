@@ -2,6 +2,13 @@ import { MessageSquare, Linkedin, Zap, ArrowRight, Sparkles, Bot } from "lucide-
 import { Button } from "@/components/ui/button";
 
 export const HeroSection = () => {
+  const scrollToPostGenerator = () => {
+    const postGeneratorSection = document.querySelector('.post-generator-section');
+    if (postGeneratorSection) {
+      postGeneratorSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return <section className="section-spacing bg-gradient-to-br from-background via-primary/5 to-accent/10 relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0">
@@ -57,9 +64,9 @@ export const HeroSection = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 animate-slide-up" style={{
           animationDelay: '0.4s'
         }}>
-            <Button className="btn-hero group relative overflow-hidden">
+            <Button onClick={scrollToPostGenerator} className="btn-hero group relative overflow-hidden">
               <span className="relative z-10 flex items-center">
-                Get Started Free
+                Get Started
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-accent to-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>

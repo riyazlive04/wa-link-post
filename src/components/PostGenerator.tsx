@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { AudioInput } from './AudioInput';
 import { Button } from '@/components/ui/button';
@@ -195,7 +194,7 @@ export const PostGenerator = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 post-generator-section">
       {/* Demo Mode Notice */}
       <Card className="border-blue-200 bg-blue-50/50">
         <CardContent className="pt-6">
