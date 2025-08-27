@@ -23,7 +23,8 @@ serve(async (req) => {
       postId: requestData.postId,
       audioFileName: requestData.audioFileName,
       audioFilePresent: !!requestData.audioFile,
-      audioFileLength: requestData.audioFile ? requestData.audioFile.length : 0
+      audioFileLength: requestData.audioFile ? requestData.audioFile.length : 0,
+      language: requestData.language || 'en-US'
     })
     
     // Use service role key to bypass RLS
@@ -32,7 +33,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { postId, audioFile, audioFileName } = requestData
+    const { postId, audioFile, audioFileName, language } = requestData
 
     if (!postId) {
       throw new Error('postId is required')
@@ -60,17 +61,19 @@ serve(async (req) => {
     console.log('Post status updated successfully')
     console.log('Preparing to call n8n webhook...')
 
-    // Prepare data for n8n webhook
+    // Prepare data for n8n webhook with language specification
     const webhookData = {
       postId: postId,
       audioFile: audioFile,
-      audioFileName: audioFileName || 'recording.wav'
+      audioFileName: audioFileName || 'recording.wav',
+      language: language || 'en-US'
     }
 
     console.log('Calling n8n webhook with data:', {
       postId,
       audioFileName: audioFileName || 'recording.wav',
-      audioFileSize: audioFile.length
+      audioFileSize: audioFile.length,
+      language: language || 'en-US'
     })
 
     // Call n8n webhook to generate post

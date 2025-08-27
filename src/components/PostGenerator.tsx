@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { AudioInput } from './AudioInput';
+import { LanguageSelector } from './LanguageSelector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +13,7 @@ import { Loader2, Send, CheckCircle, AlertCircle } from 'lucide-react';
 export const PostGenerator = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioFileName, setAudioFileName] = useState<string>('');
+  const [language, setLanguage] = useState<string>('en-US');
   const [generatedContent, setGeneratedContent] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -39,7 +41,7 @@ export const PostGenerator = () => {
     setStatus('Creating post...');
 
     try {
-      console.log('Creating new post with audio file:', audioFileName);
+      console.log('Creating new post with audio file:', audioFileName, 'Language:', language);
 
       // Create a new post record for authenticated user
       const { data: post, error } = await supabase
@@ -66,14 +68,15 @@ export const PostGenerator = () => {
       const uint8Array = new Uint8Array(arrayBuffer);
       const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
 
-      console.log('Calling generate-post function with postId:', post.id);
+      console.log('Calling generate-post function with postId:', post.id, 'Language:', language);
 
-      // Call the generate-post edge function
+      // Call the generate-post edge function with language parameter
       const { data, error: functionError } = await supabase.functions.invoke('generate-post', {
         body: {
           postId: post.id,
           audioFile: base64Audio,
-          audioFileName: audioFileName
+          audioFileName: audioFileName,
+          language: language
         }
       });
 
@@ -171,6 +174,7 @@ export const PostGenerator = () => {
         setAudioFileName('');
         setGeneratedContent('');
         setPostId(null);
+        setLanguage('en-US'); // Reset to default language
       } else {
         throw new Error(result?.error || 'Failed to publish post to LinkedIn');
       }
@@ -221,6 +225,12 @@ export const PostGenerator = () => {
         <CardContent className="space-y-6">
           <AudioInput 
             onAudioReady={handleAudioReady}
+            disabled={isGenerating || isPublishing}
+          />
+
+          <LanguageSelector
+            value={language}
+            onChange={setLanguage}
             disabled={isGenerating || isPublishing}
           />
 
