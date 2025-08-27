@@ -12,8 +12,19 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let requestData: any = null;
+  
   try {
     console.log('Generate post function started')
+    
+    // Parse request data once and store it
+    requestData = await req.json()
+    console.log('Parsed request data:', {
+      postId: requestData.postId,
+      audioFileName: requestData.audioFileName,
+      audioFilePresent: !!requestData.audioFile,
+      audioFileLength: requestData.audioFile ? requestData.audioFile.length : 0
+    })
     
     // Use service role key to bypass RLS
     const supabase = createClient(
@@ -21,8 +32,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { postId, audioFile, audioFileName } = await req.json()
-    console.log('Received request for postId:', postId, 'audioFileName:', audioFileName)
+    const { postId, audioFile, audioFileName } = requestData
 
     if (!postId) {
       throw new Error('postId is required')
@@ -73,47 +83,73 @@ serve(async (req) => {
     })
 
     console.log('N8N webhook response status:', webhookResponse.status)
+    console.log('N8N webhook response headers:', Object.fromEntries(webhookResponse.headers.entries()))
     
     let webhookResult;
     try {
       const responseText = await webhookResponse.text();
       console.log('N8N raw response:', responseText);
+      
+      if (!responseText.trim()) {
+        throw new Error('Empty response from n8n webhook');
+      }
+      
       webhookResult = JSON.parse(responseText);
+      console.log('N8N parsed response:', webhookResult)
     } catch (parseError) {
       console.error('Failed to parse n8n response as JSON:', parseError);
       throw new Error('Invalid response from content generation service');
     }
 
-    console.log('N8N parsed response:', webhookResult)
-
-    if (webhookResponse.ok && webhookResult?.content) {
-      console.log('N8N webhook successful, updating post with content...')
+    // Check for successful response with content
+    if (webhookResponse.ok) {
+      console.log('N8N webhook response OK, checking for content...')
       
-      // Update post with generated content
-      const { error: contentError } = await supabase
-        .from('posts')
-        .update({ 
-          content: webhookResult.content,
-          status: 'generated',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', postId)
-
-      if (contentError) {
-        console.error('Error updating post content:', contentError)
-        throw contentError
+      // Handle different possible response formats
+      let generatedContent = null;
+      
+      if (webhookResult?.content) {
+        generatedContent = webhookResult.content;
+      } else if (webhookResult?.output) {
+        generatedContent = webhookResult.output;
+      } else if (typeof webhookResult === 'string') {
+        generatedContent = webhookResult;
       }
+      
+      console.log('Extracted content:', generatedContent ? 'Content found' : 'No content found')
+      
+      if (generatedContent) {
+        console.log('Updating post with generated content...')
+        
+        // Update post with generated content
+        const { error: contentError } = await supabase
+          .from('posts')
+          .update({ 
+            content: generatedContent,
+            status: 'generated',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', postId)
 
-      console.log('Post updated successfully with generated content')
+        if (contentError) {
+          console.error('Error updating post content:', contentError)
+          throw contentError
+        }
 
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          content: webhookResult.content,
-          postId: postId
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        console.log('Post updated successfully with generated content')
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            content: generatedContent,
+            postId: postId
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } else {
+        console.error('No content found in n8n response')
+        throw new Error('N8N response does not contain expected content field')
+      }
     } else {
       console.error('N8N webhook failed with status:', webhookResponse.status)
       console.error('N8N error response:', webhookResult)
@@ -127,16 +163,15 @@ serve(async (req) => {
         })
         .eq('id', postId)
 
-      throw new Error(webhookResult?.error || `N8N webhook failed with status ${webhookResponse.status}`)
+      throw new Error(webhookResult?.error || webhookResult?.message || `N8N webhook failed with status ${webhookResponse.status}`)
     }
 
   } catch (error) {
     console.error('Error in generate-post function:', error)
     
-    // Try to update post status to failed if we have a postId
-    try {
-      const { postId } = await req.json()
-      if (postId) {
+    // Try to update post status to failed if we have requestData
+    if (requestData?.postId) {
+      try {
         const supabase = createClient(
           Deno.env.get('SUPABASE_URL') ?? '',
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -148,10 +183,12 @@ serve(async (req) => {
             status: 'failed',
             updated_at: new Date().toISOString()
           })
-          .eq('id', postId)
+          .eq('id', requestData.postId)
+          
+        console.log('Updated post status to failed for postId:', requestData.postId)
+      } catch (updateError) {
+        console.error('Error updating failed status:', updateError)
       }
-    } catch (updateError) {
-      console.error('Error updating failed status:', updateError)
     }
     
     return new Response(
