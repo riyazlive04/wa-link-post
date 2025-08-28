@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { encryptData, decryptData, sanitizeForDevTools } from '@/utils/encryption';
 
 interface AuthContextType {
   user: User | null;
@@ -30,7 +31,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
+        // Sanitize session data for console logs
+        const sanitizedSession = session ? sanitizeForDevTools(session) : null;
+        console.log('Auth state changed:', event, sanitizedSession?.user?.id);
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -63,24 +67,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Saving LinkedIn tokens for user:', session.user.id);
 
-      // Save tokens via edge function
+      // Encrypt tokens before sending
+      const encryptedAccessToken = encryptData(session.provider_token);
+      const encryptedRefreshToken = session.provider_refresh_token ? 
+        encryptData(session.provider_refresh_token) : null;
+
+      // Save tokens via edge function with encrypted data
       const { error } = await supabase.functions.invoke('save-linkedin-tokens', {
         body: {
           userId: session.user.id,
-          access_token: session.provider_token,
-          refresh_token: session.provider_refresh_token,
-          expires_in: 3600, // LinkedIn typically gives 60 days, but we'll refresh more frequently
+          access_token: encryptedAccessToken,
+          refresh_token: encryptedRefreshToken,
+          expires_in: 3600,
           scope: 'openid profile w_member_social'
         }
       });
 
       if (error) {
-        console.error('Error saving LinkedIn tokens:', error);
+        console.error('Error saving LinkedIn tokens:', sanitizeForDevTools(error));
       } else {
         console.log('LinkedIn tokens saved successfully');
       }
     } catch (error) {
-      console.error('Error in saveLinkedInTokens:', error);
+      console.error('Error in saveLinkedInTokens:', sanitizeForDevTools(error));
     }
   };
 
@@ -94,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (error) {
-      console.error('LinkedIn sign-in error:', error);
+      console.error('LinkedIn sign-in error:', sanitizeForDevTools(error));
       throw error;
     }
   };
@@ -102,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      console.error('Sign out error:', error);
+      console.error('Sign out error:', sanitizeForDevTools(error));
       throw error;
     }
   };

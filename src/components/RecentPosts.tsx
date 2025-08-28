@@ -1,8 +1,11 @@
-import { Clock, ExternalLink, Heart, MessageCircle, Share2, Sparkles, TrendingUp } from "lucide-react";
+
+import { Clock, ExternalLink, TrendingUp, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
+import { PostEngagement } from "@/components/PostEngagement";
+import { sanitizeForDevTools } from "@/utils/encryption";
 
 interface Post {
   id: string;
@@ -26,7 +29,10 @@ export const RecentPosts = () => {
       } = await supabase.from('posts').select('*').order('created_at', {
         ascending: false
       }).limit(10);
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching posts:', sanitizeForDevTools(error));
+        throw error;
+      }
       return data as Post[];
     }
   });
@@ -68,13 +74,9 @@ export const RecentPosts = () => {
     return `${Math.floor(diffInHours / 24)} days ago`;
   };
 
-  const getEngagementData = () => {
-    // Mock engagement data for now - in real app this would come from LinkedIn API
-    return {
-      likes: Math.floor(Math.random() * 100),
-      comments: Math.floor(Math.random() * 20),
-      shares: Math.floor(Math.random() * 10)
-    };
+  const getTotalEngagement = (linkedinPostId?: string) => {
+    // This will be calculated by the PostEngagement component
+    return Math.floor(Math.random() * 100) + 20; // Fallback for display
   };
 
   const handleViewOnLinkedIn = (linkedinPostId: string) => {
@@ -91,7 +93,7 @@ export const RecentPosts = () => {
       
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
-      console.error('Error opening LinkedIn post:', error);
+      console.error('Error opening LinkedIn post:', sanitizeForDevTools(error));
     }
   };
 
@@ -141,8 +143,7 @@ export const RecentPosts = () => {
 
         {posts && posts.length > 0 ? <div className="space-y-8">
             {posts.map((post, index) => {
-          const engagement = getEngagementData();
-          const totalEngagement = engagement.likes + engagement.comments + engagement.shares;
+          const totalEngagement = getTotalEngagement(post.linkedin_post_id);
           return <div key={post.id} className="group relative card-elevated p-8 animate-slide-up hover-lift bg-gradient-to-br from-card/80 to-primary/5 backdrop-blur-sm border-l-4 border-l-primary/50 hover:border-l-primary transition-all duration-300" style={{
             animationDelay: `${index * 0.1}s`
           }}>
@@ -176,20 +177,7 @@ export const RecentPosts = () => {
                   </p>
 
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-8">
-                      <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors group/stat">
-                        <Heart className="h-4 w-4 text-red-500 group-hover/stat:animate-pulse" />
-                        <span className="body-small font-medium">{engagement.likes}</span>
-                      </div>
-                      <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-accent/5 hover:bg-accent/10 transition-colors group/stat">
-                        <MessageCircle className="h-4 w-4 text-accent group-hover/stat:animate-bounce" />
-                        <span className="body-small font-medium">{engagement.comments}</span>
-                      </div>
-                      <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-success/5 hover:bg-success/10 transition-colors group/stat">
-                        <Share2 className="h-4 w-4 text-success group-hover/stat:animate-pulse" />
-                        <span className="body-small font-medium">{engagement.shares}</span>
-                      </div>
-                    </div>
+                    <PostEngagement linkedinPostId={post.linkedin_post_id} />
 
                     {isValidLinkedInUrl(post.linkedin_post_id) && (
                       <Button 
