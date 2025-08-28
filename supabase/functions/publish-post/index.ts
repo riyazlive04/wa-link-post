@@ -25,10 +25,10 @@ serve(async (req) => {
 
     console.log('Publishing post for user:', userId)
 
-    // Get LinkedIn tokens for the user - include both member IDs
+    // Get LinkedIn tokens for the user
     const { data: tokenData, error: tokenError } = await supabase
       .from('linkedin_tokens')
-      .select('access_token, expires_at, person_urn, member_id, legacy_member_id')
+      .select('access_token, expires_at, person_urn, member_id')
       .eq('user_id', userId)
       .single()
 
@@ -52,38 +52,22 @@ serve(async (req) => {
       .update({ status: 'publishing' })
       .eq('id', postId)
 
-    // Determine which member ID to use and API endpoint
-    let authorUrn;
-    let apiEndpoint = 'ugc'; // Default to UGC API which works with numeric IDs
-    let memberIdToUse = tokenData.member_id;
+    // Always use UGC API with person URN format
+    const authorUrn = `urn:li:person:${tokenData.member_id}`;
+    const apiEndpoint = 'ugc';
     
-    // Prioritize scraped numeric member ID for UGC API
-    if (tokenData.legacy_member_id && tokenData.legacy_member_id !== null) {
-      authorUrn = `urn:li:member:${tokenData.legacy_member_id}`;
-      memberIdToUse = tokenData.legacy_member_id;
-      apiEndpoint = 'ugc';
-      console.log('Using scraped numeric member ID for UGC API:', tokenData.legacy_member_id);
-    } else {
-      // Fall back to shares API with alphanumeric member ID
-      authorUrn = `urn:li:member:${tokenData.member_id}`;
-      memberIdToUse = tokenData.member_id;
-      apiEndpoint = 'shares';
-      console.log('Using alphanumeric member ID with shares API:', tokenData.member_id);
-    }
+    console.log('Using UGC API with person URN:', authorUrn);
 
-    // Prepare webhook payload
+    // Prepare webhook payload for n8n
     const webhookPayload = {
       postText: content,
       linkedinToken: tokenData.access_token,
       linkedinAuthorUrn: authorUrn,
       apiEndpoint: apiEndpoint,
-      memberIdToUse: memberIdToUse,
+      memberIdToUse: tokenData.member_id,
       // Keep backward compatibility
       linkedin_person_urn: tokenData.person_urn,
-      linkedinMemberId: tokenData.member_id,
-      legacyMemberId: tokenData.legacy_member_id || undefined,
-      // Additional context for n8n
-      isNumericMemberId: !!(tokenData.legacy_member_id && tokenData.legacy_member_id !== null)
+      linkedinMemberId: tokenData.member_id
     }
 
     console.log('Calling n8n publish webhook with payload:', {
@@ -91,13 +75,9 @@ serve(async (req) => {
       hasContent: !!content,
       hasLinkedinToken: !!tokenData.access_token,
       hasMemberId: !!tokenData.member_id,
-      hasScrapedLegacyMemberId: !!(tokenData.legacy_member_id && tokenData.legacy_member_id !== null),
       memberId: tokenData.member_id,
-      scrapedLegacyMemberId: tokenData.legacy_member_id,
-      memberIdToUse: memberIdToUse,
       linkedinAuthorUrn: authorUrn,
-      apiEndpoint: apiEndpoint,
-      isNumericMemberId: !!(tokenData.legacy_member_id && tokenData.legacy_member_id !== null)
+      apiEndpoint: apiEndpoint
     })
 
     // Call n8n webhook
@@ -138,7 +118,7 @@ serve(async (req) => {
           postUrl: linkedinPostUrl,
           linkedinPostId: webhookResult.linkedinPostId || webhookResult.id,
           usedApiEndpoint: apiEndpoint,
-          usedScrapedId: !!(tokenData.legacy_member_id && tokenData.legacy_member_id !== null)
+          authorUrn: authorUrn
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

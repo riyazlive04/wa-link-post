@@ -22,10 +22,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Try to fetch LinkedIn member ID using multiple approaches
+    // Fetch LinkedIn member ID using the API
     let memberId = null;
-    let legacyMemberId = null;
-    let profileUrl = null;
     
     console.log('Fetching LinkedIn member ID...')
     
@@ -67,96 +65,6 @@ serve(async (req) => {
         console.error('Failed to fetch LinkedIn profile:', profileResponse.status, errorText);
       }
 
-      // Try to get the user's public profile URL for scraping
-      if (memberId) {
-        console.log('Attempting to get profile URL for web scraping...');
-        
-        try {
-          const profileUrlResponse = await fetch('https://api.linkedin.com/v2/people/(id~)?projection=(publicProfileUrl)', {
-            headers: {
-              'Authorization': `Bearer ${access_token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (profileUrlResponse.ok) {
-            const profileUrlData = await profileUrlResponse.json();
-            profileUrl = profileUrlData.publicProfileUrl;
-            console.log('Got profile URL:', profileUrl);
-          } else {
-            console.log('Could not get profile URL, will construct default');
-          }
-        } catch (urlError) {
-          console.log('Error getting profile URL:', urlError.message);
-        }
-      }
-
-      // Web scrape the profile page to get the numeric data-member-id
-      if (memberId) {
-        console.log('Attempting to scrape numeric member ID from profile page...');
-        
-        try {
-          // Use the public profile URL if available, otherwise construct one
-          let scrapeUrl = profileUrl;
-          if (!scrapeUrl) {
-            // Fallback: try common LinkedIn profile URL patterns
-            scrapeUrl = `https://www.linkedin.com/in/${memberId}/`;
-          }
-          
-          console.log('Scraping URL:', scrapeUrl);
-          
-          const scrapeResponse = await fetch(scrapeUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.5',
-              'Accept-Encoding': 'gzip, deflate, br',
-              'Connection': 'keep-alive',
-              'Upgrade-Insecure-Requests': '1'
-            }
-          });
-
-          if (scrapeResponse.ok) {
-            const html = await scrapeResponse.text();
-            console.log('Successfully fetched profile HTML, length:', html.length);
-            
-            // Look for data-member-id attribute in the HTML
-            const dataMemberIdMatch = html.match(/data-member-id["\s]*=["\s]*([0-9]+)/i);
-            if (dataMemberIdMatch && dataMemberIdMatch[1]) {
-              legacyMemberId = dataMemberIdMatch[1];
-              console.log('Successfully scraped numeric member ID:', legacyMemberId);
-            } else {
-              // Try alternative patterns
-              const altPatterns = [
-                /memberToken["\s]*:["\s]*([0-9]+)/i,
-                /memberId["\s]*:["\s]*([0-9]+)/i,
-                /"memberId":"([0-9]+)"/i,
-                /data-li-member-id["\s]*=["\s]*([0-9]+)/i
-              ];
-              
-              for (const pattern of altPatterns) {
-                const match = html.match(pattern);
-                if (match && match[1]) {
-                  legacyMemberId = match[1];
-                  console.log('Found numeric member ID with alternative pattern:', legacyMemberId);
-                  break;
-                }
-              }
-              
-              if (!legacyMemberId) {
-                console.log('Could not find numeric member ID in profile HTML');
-                // Log a small sample of the HTML for debugging (first 500 chars)
-                console.log('HTML sample:', html.substring(0, 500));
-              }
-            }
-          } else {
-            console.log('Failed to scrape profile page:', scrapeResponse.status, scrapeResponse.statusText);
-          }
-        } catch (scrapeError) {
-          console.log('Error during web scraping:', scrapeError.message);
-        }
-      }
-
     } catch (profileError) {
       console.error('Error fetching LinkedIn profile:', profileError);
     }
@@ -170,7 +78,7 @@ serve(async (req) => {
     // Calculate expiration time
     const expiresAt = new Date(Date.now() + (expires_in * 1000))
 
-    // Save or update the LinkedIn tokens with both member IDs
+    // Save or update the LinkedIn tokens
     const { error } = await supabase
       .from('linkedin_tokens')
       .upsert({
@@ -178,9 +86,8 @@ serve(async (req) => {
         access_token: access_token,
         refresh_token: refresh_token,
         expires_at: expiresAt.toISOString(),
-        person_urn: `urn:li:person:${userId}`,
+        person_urn: `urn:li:person:${memberId}`,
         member_id: memberId,
-        legacy_member_id: legacyMemberId, // Store the scraped numeric ID
         scope: scope
       })
 
@@ -189,14 +96,12 @@ serve(async (req) => {
       throw error
     }
 
-    console.log('LinkedIn tokens saved successfully with member_id:', memberId, 'scraped_legacy_member_id:', legacyMemberId)
+    console.log('LinkedIn tokens saved successfully with member_id:', memberId)
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        member_id: memberId,
-        legacy_member_id: legacyMemberId,
-        scraped: !!legacyMemberId
+        member_id: memberId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
