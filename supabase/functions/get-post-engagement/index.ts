@@ -1,7 +1,24 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { decryptData } from '../../../src/utils/encryption.ts'
+
+// Encryption utilities (copied from src/utils/encryption.ts since edge functions can't import from src)
+const ENCRYPTION_KEY = 'linkedin-posts-app-2024'; // In production, this should be from environment
+
+const decryptData = (encryptedData: string): string => {
+  try {
+    const data = atob(encryptedData);
+    let decrypted = '';
+    for (let i = 0; i < data.length; i++) {
+      decrypted += String.fromCharCode(
+        data.charCodeAt(i) ^ ENCRYPTION_KEY.charCodeAt(i % ENCRYPTION_KEY.length)
+      );
+    }
+    return decrypted;
+  } catch {
+    return encryptedData; // Fallback to original if decryption fails
+  }
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
