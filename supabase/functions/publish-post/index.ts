@@ -1,5 +1,24 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+// Encryption utilities (copied from src/utils/encryption.ts since edge functions can't import from src)
+const ENCRYPTION_KEY = 'linkedin-posts-app-2024'; // In production, this should be from environment
+
+const decryptData = (encryptedData: string): string => {
+  try {
+    const data = atob(encryptedData);
+    let decrypted = '';
+    for (let i = 0; i < data.length; i++) {
+      decrypted += String.fromCharCode(
+        data.charCodeAt(i) ^ ENCRYPTION_KEY.charCodeAt(i % ENCRYPTION_KEY.length)
+      );
+    }
+    return decrypted;
+  } catch {
+    return encryptedData; // Fallback to original if decryption fails
+  }
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,16 +71,20 @@ serve(async (req) => {
       .update({ status: 'publishing' })
       .eq('id', postId)
 
+    // Decrypt the access token before use
+    const decryptedAccessToken = decryptData(tokenData.access_token);
+    console.log('Decrypted access token for API use');
+
     // Always use UGC API with person URN format
     const authorUrn = `urn:li:person:${tokenData.member_id}`;
     const apiEndpoint = 'ugc';
     
     console.log('Using UGC API with person URN:', authorUrn);
 
-    // Prepare webhook payload for n8n
+    // Prepare webhook payload for n8n with decrypted token
     const webhookPayload = {
       postText: content,
-      linkedinToken: tokenData.access_token,
+      linkedinToken: decryptedAccessToken, // Use decrypted token here
       linkedinAuthorUrn: authorUrn,
       apiEndpoint: apiEndpoint,
       memberIdToUse: tokenData.member_id,
@@ -73,7 +96,7 @@ serve(async (req) => {
     console.log('Calling n8n publish webhook with payload:', {
       postId,
       hasContent: !!content,
-      hasLinkedinToken: !!tokenData.access_token,
+      hasLinkedinToken: !!decryptedAccessToken,
       hasMemberId: !!tokenData.member_id,
       memberId: tokenData.member_id,
       linkedinAuthorUrn: authorUrn,

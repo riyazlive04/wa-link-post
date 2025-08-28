@@ -2,6 +2,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Encryption utilities (copied from src/utils/encryption.ts since edge functions can't import from src)
+const ENCRYPTION_KEY = 'linkedin-posts-app-2024'; // In production, this should be from environment
+
+const decryptData = (encryptedData: string): string => {
+  try {
+    const data = atob(encryptedData);
+    let decrypted = '';
+    for (let i = 0; i < data.length; i++) {
+      decrypted += String.fromCharCode(
+        data.charCodeAt(i) ^ ENCRYPTION_KEY.charCodeAt(i % ENCRYPTION_KEY.length)
+      );
+    }
+    return decrypted;
+  } catch {
+    return encryptedData; // Fallback to original if decryption fails
+  }
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -22,6 +40,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Decrypt the access token before making LinkedIn API calls
+    const decryptedAccessToken = decryptData(access_token);
+    console.log('Decrypted access token for LinkedIn API calls');
+
     // Fetch LinkedIn member ID using the API
     let memberId = null;
     
@@ -31,7 +53,7 @@ serve(async (req) => {
       // Try the userinfo endpoint first (works with openid scope)
       let profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
-          'Authorization': `Bearer ${access_token}`,
+          'Authorization': `Bearer ${decryptedAccessToken}`, // Use decrypted token
           'Content-Type': 'application/json'
         }
       });
@@ -40,7 +62,7 @@ serve(async (req) => {
         // Fallback to people endpoint with lite profile
         profileResponse = await fetch('https://api.linkedin.com/v2/people/(id~)', {
           headers: {
-            'Authorization': `Bearer ${access_token}`,
+            'Authorization': `Bearer ${decryptedAccessToken}`, // Use decrypted token
             'Content-Type': 'application/json'
           }
         });
@@ -83,8 +105,8 @@ serve(async (req) => {
       .from('linkedin_tokens')
       .upsert({
         user_id: userId,
-        access_token: access_token,
-        refresh_token: refresh_token,
+        access_token: access_token, // Keep encrypted in storage
+        refresh_token: refresh_token, // Keep encrypted in storage
         expires_at: expiresAt.toISOString(),
         person_urn: `urn:li:person:${memberId}`,
         member_id: memberId,
