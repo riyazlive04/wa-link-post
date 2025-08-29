@@ -103,51 +103,68 @@ serve(async (req) => {
       apiEndpoint: apiEndpoint
     })
 
-    // Call n8n webhook
-    const webhookResponse = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(webhookPayload)
-    })
+    // Create AbortController for timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout for publish
 
-    console.log('n8n webhook response status:', webhookResponse.status)
+    try {
+      // Call n8n webhook
+      const webhookResponse = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/publish-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(webhookPayload),
+        signal: controller.signal
+      })
 
-    if (!webhookResponse.ok) {
-      const errorText = await webhookResponse.text()
-      console.error('n8n webhook error:', errorText)
-      throw new Error(`n8n webhook failed: ${webhookResponse.status} - ${errorText}`)
-    }
+      clearTimeout(timeoutId);
 
-    const webhookResult = await webhookResponse.json()
-    console.log('n8n webhook response:', webhookResult)
+      console.log('n8n webhook response status:', webhookResponse.status)
 
-    if (webhookResult.success) {
-      // Store the actual LinkedIn post URL
-      const linkedinPostUrl = webhookResult.postUrl || webhookResult.linkedinPostUrl || webhookResult.url;
+      if (!webhookResponse.ok) {
+        const errorText = await webhookResponse.text()
+        console.error('n8n webhook error:', errorText)
+        throw new Error(`n8n webhook failed: ${webhookResponse.status} - ${errorText}`)
+      }
+
+      const webhookResult = await webhookResponse.json()
+      console.log('n8n webhook response:', webhookResult)
+
+      if (webhookResult.success) {
+        // Store the actual LinkedIn post URL
+        const linkedinPostUrl = webhookResult.postUrl || webhookResult.linkedinPostUrl || webhookResult.url;
+        
+        await supabase
+          .from('posts')
+          .update({ 
+            linkedin_post_id: linkedinPostUrl || 'published',
+            status: 'published'
+          })
+          .eq('id', postId)
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            postUrl: linkedinPostUrl,
+            linkedinPostId: webhookResult.linkedinPostId || webhookResult.id,
+            usedApiEndpoint: apiEndpoint,
+            authorUrn: authorUrn
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+
+      } else {
+        throw new Error(webhookResult?.error || 'Failed to publish post to LinkedIn')
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
       
-      await supabase
-        .from('posts')
-        .update({ 
-          linkedin_post_id: linkedinPostUrl || 'published',
-          status: 'published'
-        })
-        .eq('id', postId)
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          postUrl: linkedinPostUrl,
-          linkedinPostId: webhookResult.linkedinPostId || webhookResult.id,
-          usedApiEndpoint: apiEndpoint,
-          authorUrn: authorUrn
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-
-    } else {
-      throw new Error(webhookResult?.error || 'Failed to publish post to LinkedIn')
+      if (fetchError.name === 'AbortError') {
+        console.error('Publish webhook request timed out')
+        throw new Error('Publish request timed out - please try again')
+      }
+      throw fetchError;
     }
 
   } catch (error) {

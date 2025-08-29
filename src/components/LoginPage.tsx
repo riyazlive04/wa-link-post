@@ -2,65 +2,17 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Linkedin, Mail, Lock, User, ExternalLink } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Linkedin, ExternalLink } from 'lucide-react';
 
 export const LoginPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { signInWithLinkedIn } = useAuth();
   const { toast } = useToast();
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-
-        toast({
-          title: "Welcome back!",
-          description: "You have been signed in successfully.",
-        });
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`
-          }
-        });
-        if (error) throw error;
-
-        toast({
-          title: "Account created!",
-          description: "Please check your email for verification.",
-        });
-      }
-    } catch (error: any) {
-      console.error('Auth error:', error);
-      toast({
-        title: "Authentication Error",
-        description: error.message || "An error occurred during authentication.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLinkedInAuth = async () => {
+    setLoading(true);
     try {
       await signInWithLinkedIn();
     } catch (error: any) {
@@ -70,6 +22,8 @@ export const LoginPage = () => {
         description: error.message || "Failed to connect with LinkedIn.",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -82,98 +36,23 @@ export const LoginPage = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+            Welcome to LinkedIn Post Agent
           </CardTitle>
           <CardDescription>
-            {isLogin 
-              ? 'Sign in to your LinkedIn Post Agent account' 
-              : 'Sign up to start generating LinkedIn posts'
-            }
+            Sign in with your LinkedIn account to start generating posts
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {/* LinkedIn OAuth Button */}
           <Button
             onClick={handleLinkedInAuth}
             className="w-full bg-[#0077B5] hover:bg-[#005885] text-white"
             size="lg"
+            disabled={loading}
           >
             <Linkedin className="mr-2 h-5 w-5" />
-            Continue with LinkedIn
+            {loading ? 'Connecting...' : 'Continue with LinkedIn'}
           </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-
-          {/* Email/Password Form */}
-          <form onSubmit={handleEmailAuth} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-9"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-9"
-                  required
-                />
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <User className="mr-2 h-4 w-4 animate-spin" />
-                  {isLogin ? 'Signing in...' : 'Creating account...'}
-                </>
-              ) : (
-                <>
-                  <User className="mr-2 h-4 w-4" />
-                  {isLogin ? 'Sign In' : 'Create Account'}
-                </>
-              )}
-            </Button>
-          </form>
-
-          <div className="text-center">
-            <Button
-              variant="link"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm"
-            >
-              {isLogin 
-                ? "Don't have an account? Sign up" 
-                : 'Already have an account? Sign in'
-              }
-            </Button>
-          </div>
 
           {/* Developer Help */}
           <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">

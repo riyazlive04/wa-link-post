@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -87,7 +88,7 @@ serve(async (req) => {
     }
 
     console.log('LinkedIn token retrieved successfully')
-    console.log('Preparing to call n8n webhook...')
+    console.log('Preparing to call n8n webhook for audio processing...')
 
     // Prepare data for n8n webhook with LinkedIn token and person_urn
     const webhookData = {
@@ -110,97 +111,114 @@ serve(async (req) => {
       hasPersonUrn: !!tokenData.person_urn
     })
 
-    // Call n8n webhook to generate post
-    const webhookResponse = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/generate-post', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(webhookData)
-    })
+    // Create AbortController for timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout for longer audio
 
-    console.log('N8N webhook response status:', webhookResponse.status)
-    console.log('N8N webhook response headers:', Object.fromEntries(webhookResponse.headers.entries()))
-    
-    let webhookResult;
     try {
-      const responseText = await webhookResponse.text();
-      console.log('N8N raw response:', responseText);
-      
-      if (!responseText.trim()) {
-        throw new Error('Empty response from n8n webhook');
-      }
-      
-      webhookResult = JSON.parse(responseText);
-      console.log('N8N parsed response:', webhookResult)
-    } catch (parseError) {
-      console.error('Failed to parse n8n response as JSON:', parseError);
-      throw new Error('Invalid response from content generation service');
-    }
+      // Call n8n webhook to generate post with extended timeout
+      const webhookResponse = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/generate-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(webhookData),
+        signal: controller.signal
+      })
 
-    // Check for successful response with content
-    if (webhookResponse.ok) {
-      console.log('N8N webhook response OK, checking for content...')
+      clearTimeout(timeoutId);
+
+      console.log('N8N webhook response status:', webhookResponse.status)
+      console.log('N8N webhook response headers:', Object.fromEntries(webhookResponse.headers.entries()))
       
-      // Handle different possible response formats
-      let generatedContent = null;
-      
-      if (webhookResult?.content) {
-        generatedContent = webhookResult.content;
-      } else if (webhookResult?.output) {
-        generatedContent = webhookResult.output;
-      } else if (typeof webhookResult === 'string') {
-        generatedContent = webhookResult;
-      }
-      
-      console.log('Extracted content:', generatedContent ? 'Content found' : 'No content found')
-      
-      if (generatedContent) {
-        console.log('Updating post with generated content...')
+      let webhookResult;
+      try {
+        const responseText = await webhookResponse.text();
+        console.log('N8N raw response length:', responseText.length);
         
-        // Update post with generated content
-        const { error: contentError } = await supabase
+        if (!responseText.trim()) {
+          throw new Error('Empty response from n8n webhook');
+        }
+        
+        webhookResult = JSON.parse(responseText);
+        console.log('N8N parsed response success:', !!webhookResult.content || !!webhookResult.output)
+      } catch (parseError) {
+        console.error('Failed to parse n8n response as JSON:', parseError);
+        throw new Error('Invalid response from content generation service');
+      }
+
+      // Check for successful response with content
+      if (webhookResponse.ok) {
+        console.log('N8N webhook response OK, checking for content...')
+        
+        // Handle different possible response formats
+        let generatedContent = null;
+        
+        if (webhookResult?.content) {
+          generatedContent = webhookResult.content;
+        } else if (webhookResult?.output) {
+          generatedContent = webhookResult.output;
+        } else if (typeof webhookResult === 'string') {
+          generatedContent = webhookResult;
+        }
+        
+        console.log('Extracted content:', generatedContent ? 'Content found' : 'No content found')
+        
+        if (generatedContent) {
+          console.log('Updating post with generated content...')
+          
+          // Update post with generated content
+          const { error: contentError } = await supabase
+            .from('posts')
+            .update({ 
+              content: generatedContent,
+              status: 'generated',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', postId)
+
+          if (contentError) {
+            console.error('Error updating post content:', contentError)
+            throw contentError
+          }
+
+          console.log('Post updated successfully with generated content')
+
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              content: generatedContent,
+              postId: postId
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } else {
+          console.error('No content found in n8n response')
+          throw new Error('N8N response does not contain expected content field')
+        }
+      } else {
+        console.error('N8N webhook failed with status:', webhookResponse.status)
+        console.error('N8N error response:', webhookResult)
+        
+        // Update post status to failed
+        await supabase
           .from('posts')
           .update({ 
-            content: generatedContent,
-            status: 'generated',
+            status: 'failed',
             updated_at: new Date().toISOString()
           })
           .eq('id', postId)
 
-        if (contentError) {
-          console.error('Error updating post content:', contentError)
-          throw contentError
-        }
-
-        console.log('Post updated successfully with generated content')
-
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            content: generatedContent,
-            postId: postId
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      } else {
-        console.error('No content found in n8n response')
-        throw new Error('N8N response does not contain expected content field')
+        throw new Error(webhookResult?.error || webhookResult?.message || `N8N webhook failed with status ${webhookResponse.status}`)
       }
-    } else {
-      console.error('N8N webhook failed with status:', webhookResponse.status)
-      console.error('N8N error response:', webhookResult)
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
       
-      // Update post status to failed
-      await supabase
-        .from('posts')
-        .update({ 
-          status: 'failed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', postId)
-
-      throw new Error(webhookResult?.error || webhookResult?.message || `N8N webhook failed with status ${webhookResponse.status}`)
+      if (fetchError.name === 'AbortError') {
+        console.error('N8N webhook request timed out after 3 minutes')
+        throw new Error('Request timed out - audio file may be too long or processing is taking longer than expected')
+      }
+      throw fetchError;
     }
 
   } catch (error) {
