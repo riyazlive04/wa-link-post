@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -5,21 +6,20 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Enhanced timeout estimation for better user feedback
 const estimateProcessingTime = (audioBlob: Blob): number => {
-  const sizeKB = audioBlob.size / 1024;
-  console.log(`Estimating processing time for ${sizeKB} KB audio file`);
+  const sizeMB = audioBlob.size / (1024 * 1024);
+  console.log(`Estimating processing time for ${sizeMB.toFixed(2)} MB audio file`);
   
-  // More accurate estimation based on actual processing patterns
-  let processingTimeSeconds = 180; // Base 3 minutes
+  // More realistic estimation based on background processing
+  let processingTimeSeconds = 120; // Base 2 minutes for background processing
   
-  if (sizeKB > 1024) { // Files larger than 1MB
-    const sizeMB = sizeKB / 1024;
-    processingTimeSeconds = Math.max(300, sizeMB * 120); // 2 minutes per MB
+  if (sizeMB > 1) {
+    processingTimeSeconds = Math.max(180, sizeMB * 90); // 1.5 minutes per MB
   }
   
-  // Cap at 20 minutes
-  processingTimeSeconds = Math.min(1200, processingTimeSeconds);
+  // Cap at 15 minutes for very large files
+  processingTimeSeconds = Math.min(900, processingTimeSeconds);
   
-  console.log(`Estimated processing time: ${processingTimeSeconds} seconds (${processingTimeSeconds/60} minutes)`);
+  console.log(`Estimated processing time: ${processingTimeSeconds} seconds`);
   return processingTimeSeconds;
 };
 
@@ -39,81 +39,122 @@ export const usePostGeneration = () => {
   const [status, setStatus] = useState<string>('');
   const [estimatedTime, setEstimatedTime] = useState<string>('');
   
+  // Stable refs to prevent re-renders and duplicate calls
   const isGeneratingRef = useRef(false);
   const isPublishingRef = useRef(false);
-  const lastGenerationRef = useRef<{ audioBlob: Blob | null; timestamp: number } | null>(null);
+  const currentAudioBlobRef = useRef<Blob | null>(null);
+  const currentPostIdRef = useRef<string | null>(null);
+  const statusPollingRef = useRef<NodeJS.Timeout | null>(null);
   
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Clean up stuck posts on component mount
-  useEffect(() => {
-    const cleanupStuckPosts = async () => {
-      if (!user) return;
-      
-      try {
-        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-        
-        const { error } = await supabase
-          .from('posts')
-          .update({ 
-            status: 'failed',
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-          .eq('status', 'generating')
-          .lt('created_at', tenMinutesAgo);
-
-        if (error) {
-          console.error('Error cleaning up stuck posts:', error);
-        } else {
-          console.log('Cleaned up stuck posts on mount');
-        }
-      } catch (error) {
-        console.error('Error in cleanup:', error);
-      }
-    };
-
-    cleanupStuckPosts();
-  }, [user]);
-
+  // Stable callback for audio ready
   const handleAudioReady = useCallback((blob: Blob, fileName: string) => {
-    console.log('Audio ready:', fileName, 'Size:', blob.size, 'KB:', Math.round(blob.size / 1024));
-    setAudioBlob(blob);
-    setAudioFileName(fileName);
+    console.log('Audio ready:', fileName, 'Size:', Math.round(blob.size / 1024), 'KB');
     
-    // Calculate and display estimated processing time
-    const estimatedSeconds = estimateProcessingTime(blob);
-    const timeString = formatProcessingTime(estimatedSeconds);
-    setEstimatedTime(timeString);
-    
-    // Show file size warning for large files
-    const sizeMB = blob.size / (1024 * 1024);
-    if (sizeMB > 5) {
-      toast({
-        title: "Large File Detected",
-        description: `This ${sizeMB.toFixed(1)}MB file will take approximately ${timeString} to process. Consider using shorter recordings for faster results.`,
-        variant: "default"
-      });
+    // Only update if actually different
+    if (currentAudioBlobRef.current !== blob) {
+      setAudioBlob(blob);
+      setAudioFileName(fileName);
+      currentAudioBlobRef.current = blob;
+      
+      // Calculate and display estimated processing time
+      const estimatedSeconds = estimateProcessingTime(blob);
+      const timeString = formatProcessingTime(estimatedSeconds);
+      setEstimatedTime(timeString);
+      
+      // Reset generation state
+      setStatus('');
+      setGeneratedContent('');
+      setPostId(null);
+      currentPostIdRef.current = null;
+      
+      // Clear any existing polling
+      if (statusPollingRef.current) {
+        clearInterval(statusPollingRef.current);
+        statusPollingRef.current = null;
+      }
     }
-    
-    // Reset status
-    setStatus('');
-    setGeneratedContent('');
-    setPostId(null);
+  }, []); // Stable dependencies
+
+  // Status polling function
+  const pollPostStatus = useCallback(async (jobId: string) => {
+    try {
+      const { data: post, error } = await supabase
+        .from('posts')
+        .select('status, content, updated_at')
+        .eq('id', jobId)
+        .single();
+
+      if (error) {
+        console.error('Error polling post status:', error);
+        return;
+      }
+
+      console.log(`Post ${jobId} status: ${post.status}`);
+
+      if (post.status === 'generated' && post.content) {
+        // Success - stop polling
+        if (statusPollingRef.current) {
+          clearInterval(statusPollingRef.current);
+          statusPollingRef.current = null;
+        }
+        
+        setGeneratedContent(post.content);
+        setStatus('Content generated successfully!');
+        setIsGenerating(false);
+        isGeneratingRef.current = false;
+        
+        toast({
+          title: "Success",
+          description: "Post content generated successfully!",
+        });
+        
+      } else if (post.status === 'failed') {
+        // Failed - stop polling
+        if (statusPollingRef.current) {
+          clearInterval(statusPollingRef.current);
+          statusPollingRef.current = null;
+        }
+        
+        setStatus('Content generation failed');
+        setIsGenerating(false);
+        isGeneratingRef.current = false;
+        
+        toast({
+          title: "Error",
+          description: "Failed to generate post content. Please try again.",
+          variant: "destructive"
+        });
+        
+      } else if (post.status === 'processing') {
+        setStatus('Processing audio and generating content...');
+      } else if (post.status === 'queued') {
+        setStatus('Post queued for processing...');
+      }
+      
+    } catch (error) {
+      console.error('Polling error:', error);
+    }
   }, [toast]);
 
+  // Stable generate post function with enforced guards
   const generatePost = useCallback(async () => {
-    console.log('=== GENERATE POST STARTED ===');
+    console.log('=== GENERATE POST CALLED ===', {
+      isGenerating: isGeneratingRef.current,
+      hasAudioBlob: !!audioBlob,
+      hasUser: !!user
+    });
     
+    // Enforce strict guards
     if (isGeneratingRef.current) {
-      console.log('Already generating, skipping duplicate request');
+      console.log('Generation already in progress, ignoring');
       return;
     }
     
     if (!audioBlob || !user) {
       const errorMsg = !user ? "Please sign in to generate posts." : "Please record or upload an audio file first.";
-      console.error('Generate post validation failed:', errorMsg);
       toast({
         title: "Error",
         description: errorMsg,
@@ -122,38 +163,25 @@ export const usePostGeneration = () => {
       return;
     }
 
-    // Enhanced duplicate prevention
-    const now = Date.now();
-    if (lastGenerationRef.current && 
-        lastGenerationRef.current.audioBlob === audioBlob && 
-        now - lastGenerationRef.current.timestamp < 10000) { // Increased to 10 seconds
-      console.log('Duplicate generation attempt detected, skipping...');
+    // Check if this is the same audio blob we're already processing
+    if (currentPostIdRef.current && currentAudioBlobRef.current === audioBlob) {
+      console.log('Same audio already being processed, ignoring');
       return;
     }
 
-    lastGenerationRef.current = { audioBlob, timestamp: now };
-
+    // Set guards immediately
     isGeneratingRef.current = true;
     setIsGenerating(true);
     
-    const estimatedSeconds = estimateProcessingTime(audioBlob);
-    const timeString = formatProcessingTime(estimatedSeconds);
     const sizeMB = (audioBlob.size / (1024 * 1024)).toFixed(1);
+    const timeString = formatProcessingTime(estimateProcessingTime(audioBlob));
     
-    setStatus(`Creating post... (estimated time: ${timeString} for ${sizeMB}MB file)`);
+    setStatus(`Preparing ${sizeMB}MB audio for processing...`);
 
     try {
-      console.log('Creating post record:', {
-        fileName: audioFileName,
-        size: audioBlob.size,
-        sizeKB: Math.round(audioBlob.size / 1024),
-        estimatedTime: timeString,
-        language: language
-      });
-
       // Enhanced file size validation
       if (audioBlob.size > 15 * 1024 * 1024) {
-        throw new Error('Audio file is too large (max 15MB). Please use a shorter recording or compress the file.');
+        throw new Error('Audio file is too large (max 15MB). Please use a shorter recording.');
       }
 
       // Create post record
@@ -161,55 +189,32 @@ export const usePostGeneration = () => {
         .from('posts')
         .insert({
           audio_file_name: audioFileName,
-          status: 'generating',
+          status: 'creating',
           user_id: user.id
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating post:', error);
         throw new Error(`Failed to create post: ${error.message}`);
       }
 
-      console.log('Post created successfully:', post.id);
+      console.log('Post created:', post.id);
       setPostId(post.id);
-      setStatus(`Processing ${sizeMB}MB audio file... (estimated: ${timeString})`);
+      currentPostIdRef.current = post.id;
+      setStatus(`Queuing ${sizeMB}MB audio for processing (estimated: ${timeString})`);
 
-      // Enhanced base64 conversion with progress tracking
-      console.log('Converting audio to base64...');
+      // Convert audio to base64 efficiently
       const arrayBuffer = await audioBlob.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
-      
-      // Process in chunks for large files to prevent memory issues
-      let base64Audio: string;
-      try {
-        base64Audio = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
-      } catch (error) {
-        console.error('Base64 conversion failed:', error);
-        throw new Error('Failed to process audio file. The file may be too large or corrupted.');
-      }
+      const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
 
-      console.log('Base64 conversion completed:', {
+      console.log('Audio converted to base64:', {
         originalSize: audioBlob.size,
-        base64Length: base64Audio.length,
-        estimatedSizeKB: Math.round((base64Audio.length * 3) / (4 * 1024)),
-        compressionRatio: (base64Audio.length / audioBlob.size).toFixed(2)
+        base64Length: base64Audio.length
       });
 
-      setStatus(`Generating content from ${sizeMB}MB audio... This may take ${timeString}.`);
-
-      console.log('=== CALLING EDGE FUNCTION ===', {
-        postId: post.id,
-        audioSize: audioBlob.size,
-        language,
-        userId: user.id,
-        estimatedProcessing: timeString
-      });
-
-      const functionStartTime = Date.now();
-
-      // Call edge function with enhanced error handling
+      // Call edge function for async processing
       const { data, error: functionError } = await supabase.functions.invoke('generate-post', {
         body: {
           postId: post.id,
@@ -220,96 +225,52 @@ export const usePostGeneration = () => {
         }
       });
 
-      const functionDuration = (Date.now() - functionStartTime) / 1000;
-      console.log(`Edge function completed in ${functionDuration} seconds`);
-
       if (functionError) {
-        console.error('Edge function error:', functionError);
-        throw new Error(functionError.message || 'Content generation service failed');
+        throw new Error(functionError.message || 'Failed to start processing');
       }
 
-      console.log('Edge function response:', {
-        success: data?.success,
-        hasContent: !!data?.content,
-        contentLength: data?.content?.length || 0,
-        processingTime: data?.processingTime || functionDuration,
-        error: data?.error
-      });
-
-      if (data?.success && data?.content) {
-        setGeneratedContent(data.content);
-        const finalTime = data.processingTime ? `${Math.round(data.processingTime)}s` : `${Math.round(functionDuration)}s`;
-        setStatus(`Content generated successfully! (completed in ${finalTime} for ${sizeMB}MB file)`);
+      if (data?.success) {
+        console.log('Processing started:', data);
+        setStatus(`Processing ${sizeMB}MB audio in background (${timeString} estimated)`);
+        
+        // Start polling for status updates
+        statusPollingRef.current = setInterval(() => {
+          pollPostStatus(post.id);
+        }, 3000); // Poll every 3 seconds
         
         toast({
-          title: "Success",
-          description: `Post content generated successfully in ${finalTime} from ${sizeMB}MB audio file!`,
+          title: "Processing Started",
+          description: `Your ${sizeMB}MB audio file is being processed. This may take ${timeString}.`,
         });
       } else {
-        const errorMsg = data?.error || 'Content generation failed - no content returned';
-        console.error('Content generation failed:', errorMsg);
-        throw new Error(errorMsg);
+        throw new Error(data?.error || 'Failed to start processing');
       }
 
     } catch (error: any) {
-      console.error('=== GENERATE POST ERROR ===', {
-        errorMessage: error.message,
-        errorName: error.name,
-        audioSize: audioBlob.size,
-        postId: postId
-      });
+      console.error('Generate post error:', error);
       
-      setStatus('Failed to generate post');
-      
-      // Update post status if we have postId
-      if (postId) {
-        try {
-          await supabase
-            .from('posts')
-            .update({ status: 'failed', updated_at: new Date().toISOString() })
-            .eq('id', postId);
-        } catch (updateError) {
-          console.error('Error updating post status to failed:', updateError);
-        }
-      }
-      
-      // Enhanced error messaging
-      let errorMessage = error.message;
-      if (error.message.includes('timed out') || error.message.includes('timeout')) {
-        errorMessage = `Processing timed out for ${sizeMB}MB file. Try using shorter audio segments (under 5 minutes) or compressing the file.`;
-      } else if (error.message.includes('too large')) {
-        errorMessage = `Audio file (${sizeMB}MB) is too large. Please use files smaller than 15MB.`;
-      } else if (error.message.includes('LinkedIn token expired')) {
-        errorMessage = 'LinkedIn token expired. Please sign out and sign back in to refresh your connection.';
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        errorMessage = 'Network error occurred. Please check your internet connection and try again.';
-      }
-      
-      toast({
-        title: "Error",
-        description: `Failed to generate post: ${errorMessage}`,
-        variant: "destructive"
-      });
-    } finally {
+      // Reset state on error
       isGeneratingRef.current = false;
       setIsGenerating(false);
-    }
-  }, [audioBlob, user, audioFileName, language, toast, postId]);
-
-  const publishPost = useCallback(async () => {
-    console.log('publishPost called - checking conditions');
-    
-    if (isPublishingRef.current) {
-      console.log('Already publishing (ref check), skipping...');
-      return;
-    }
-    
-    if (!postId || !generatedContent || !user) {
+      setStatus('Failed to start processing');
+      currentPostIdRef.current = null;
+      
+      if (statusPollingRef.current) {
+        clearInterval(statusPollingRef.current);
+        statusPollingRef.current = null;
+      }
+      
       toast({
         title: "Error",
-        description: "No post to publish or user not authenticated.",
+        description: `Failed to generate post: ${error.message}`,
         variant: "destructive"
       });
+    }
+  }, [audioBlob, user, audioFileName, language, toast, pollPostStatus]); // Stable dependencies
+
+  // Stable publish function
+  const publishPost = useCallback(async () => {
+    if (isPublishingRef.current || !postId || !generatedContent || !user) {
       return;
     }
 
@@ -318,8 +279,6 @@ export const usePostGeneration = () => {
     setStatus('Publishing to LinkedIn...');
 
     try {
-      console.log('Publishing post with content length:', generatedContent.length);
-
       const { data, error: functionError } = await supabase.functions.invoke('publish-post', {
         body: {
           userId: user.id,
@@ -329,11 +288,8 @@ export const usePostGeneration = () => {
       });
 
       if (functionError) {
-        console.error('Publish edge function error:', functionError);
         throw functionError;
       }
-
-      console.log('Publish post response:', data);
 
       if (data?.success) {
         setStatus('Post published successfully!');
@@ -352,21 +308,14 @@ export const usePostGeneration = () => {
         setStatus('');
         setEstimatedTime('');
         
-        lastGenerationRef.current = null;
+        currentAudioBlobRef.current = null;
+        currentPostIdRef.current = null;
       } else {
-        throw new Error(data?.error || 'Failed to publish post to LinkedIn');
+        throw new Error(data?.error || 'Failed to publish post');
       }
 
     } catch (error: any) {
-      console.error('Error publishing post:', error);
-      
-      if (postId) {
-        await supabase
-          .from('posts')
-          .update({ status: 'failed', updated_at: new Date().toISOString() })
-          .eq('id', postId);
-      }
-      
+      console.error('Publish error:', error);
       setStatus('Failed to publish post');
       toast({
         title: "Error",
@@ -377,7 +326,16 @@ export const usePostGeneration = () => {
       isPublishingRef.current = false;
       setIsPublishing(false);
     }
-  }, [postId, generatedContent, user, toast]);
+  }, [postId, generatedContent, user, toast]); // Stable dependencies
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (statusPollingRef.current) {
+        clearInterval(statusPollingRef.current);
+      }
+    };
+  }, []);
 
   return {
     audioBlob,
