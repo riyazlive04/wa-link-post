@@ -88,41 +88,39 @@ serve(async (req) => {
     }
 
     console.log('LinkedIn token retrieved successfully')
-    console.log('Preparing to call n8n webhook for audio processing...')
 
-    // Prepare data for n8n webhook with LinkedIn token and person_urn
-    const webhookData = {
-      body: {
-        postId: postId,
-        audioFile: audioFile,
-        audioFileName: audioFileName || 'recording.wav',
-        language: language || 'en-US',
-        linkedinToken: tokenData.access_token,
-        linkedin_person_urn: tokenData.person_urn
-      }
+    // Prepare data for n8n webhook
+    const webhookPayload = {
+      postId: postId,
+      audioFile: audioFile,
+      audioFileName: audioFileName || 'recording.wav',
+      language: language || 'en-US',
+      linkedinToken: tokenData.access_token,
+      linkedin_person_urn: tokenData.person_urn
     }
 
-    console.log('Calling n8n webhook with data:', {
+    console.log('Calling n8n webhook with payload:', {
       postId,
       audioFileName: audioFileName || 'recording.wav',
       audioFileSize: audioFile.length,
       language: language || 'en-US',
       hasLinkedinToken: !!tokenData.access_token,
-      hasPersonUrn: !!tokenData.person_urn
+      hasPersonUrn: !!tokenData.person_urn,
+      webhookUrl: 'https://n8n.srv930949.hstgr.cloud/webhook/generate-post'
     })
 
     // Create AbortController for timeout handling
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout for longer audio
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout
 
     try {
-      // Call n8n webhook to generate post with extended timeout
+      // Call n8n webhook to generate post
       const webhookResponse = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/generate-post', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(webhookData),
+        body: JSON.stringify(webhookPayload),
         signal: controller.signal
       })
 
@@ -131,6 +129,12 @@ serve(async (req) => {
       console.log('N8N webhook response status:', webhookResponse.status)
       console.log('N8N webhook response headers:', Object.fromEntries(webhookResponse.headers.entries()))
       
+      if (!webhookResponse.ok) {
+        const errorText = await webhookResponse.text()
+        console.error('N8N webhook failed with status:', webhookResponse.status, 'Error:', errorText)
+        throw new Error(`N8N webhook failed: ${webhookResponse.status} - ${errorText}`)
+      }
+
       let webhookResult;
       try {
         const responseText = await webhookResponse.text();
@@ -147,70 +151,52 @@ serve(async (req) => {
         throw new Error('Invalid response from content generation service');
       }
 
-      // Check for successful response with content
-      if (webhookResponse.ok) {
-        console.log('N8N webhook response OK, checking for content...')
+      // Handle different possible response formats
+      let generatedContent = null;
+      
+      if (webhookResult?.content) {
+        generatedContent = webhookResult.content;
+      } else if (webhookResult?.output) {
+        generatedContent = webhookResult.output;
+      } else if (typeof webhookResult === 'string') {
+        generatedContent = webhookResult;
+      }
+      
+      console.log('Extracted content:', generatedContent ? 'Content found' : 'No content found')
+      
+      if (generatedContent) {
+        console.log('Updating post with generated content...')
         
-        // Handle different possible response formats
-        let generatedContent = null;
-        
-        if (webhookResult?.content) {
-          generatedContent = webhookResult.content;
-        } else if (webhookResult?.output) {
-          generatedContent = webhookResult.output;
-        } else if (typeof webhookResult === 'string') {
-          generatedContent = webhookResult;
-        }
-        
-        console.log('Extracted content:', generatedContent ? 'Content found' : 'No content found')
-        
-        if (generatedContent) {
-          console.log('Updating post with generated content...')
-          
-          // Update post with generated content
-          const { error: contentError } = await supabase
-            .from('posts')
-            .update({ 
-              content: generatedContent,
-              status: 'generated',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', postId)
-
-          if (contentError) {
-            console.error('Error updating post content:', contentError)
-            throw contentError
-          }
-
-          console.log('Post updated successfully with generated content')
-
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              content: generatedContent,
-              postId: postId
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        } else {
-          console.error('No content found in n8n response')
-          throw new Error('N8N response does not contain expected content field')
-        }
-      } else {
-        console.error('N8N webhook failed with status:', webhookResponse.status)
-        console.error('N8N error response:', webhookResult)
-        
-        // Update post status to failed
-        await supabase
+        // Update post with generated content
+        const { error: contentError } = await supabase
           .from('posts')
           .update({ 
-            status: 'failed',
+            content: generatedContent,
+            status: 'generated',
             updated_at: new Date().toISOString()
           })
           .eq('id', postId)
 
-        throw new Error(webhookResult?.error || webhookResult?.message || `N8N webhook failed with status ${webhookResponse.status}`)
+        if (contentError) {
+          console.error('Error updating post content:', contentError)
+          throw contentError
+        }
+
+        console.log('Post updated successfully with generated content')
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            content: generatedContent,
+            postId: postId
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } else {
+        console.error('No content found in n8n response')
+        throw new Error('N8N response does not contain expected content field')
       }
+      
     } catch (fetchError) {
       clearTimeout(timeoutId);
       
@@ -218,6 +204,8 @@ serve(async (req) => {
         console.error('N8N webhook request timed out after 3 minutes')
         throw new Error('Request timed out - audio file may be too long or processing is taking longer than expected')
       }
+      
+      console.error('Fetch error when calling n8n webhook:', fetchError)
       throw fetchError;
     }
 

@@ -42,7 +42,7 @@ serve(async (req) => {
 
     const { userId, postId, content } = requestBody
 
-    console.log('Publishing post for user:', userId)
+    console.log('Publishing post for user:', userId, 'postId:', postId)
 
     // Get LinkedIn tokens for the user
     const { data: tokenData, error: tokenError } = await supabase
@@ -84,7 +84,7 @@ serve(async (req) => {
     // Prepare webhook payload for n8n with decrypted token
     const webhookPayload = {
       postText: content,
-      linkedinToken: decryptedAccessToken, // Use decrypted token here
+      linkedinToken: decryptedAccessToken,
       linkedinAuthorUrn: authorUrn,
       apiEndpoint: apiEndpoint,
       memberIdToUse: tokenData.member_id,
@@ -100,7 +100,8 @@ serve(async (req) => {
       hasMemberId: !!tokenData.member_id,
       memberId: tokenData.member_id,
       linkedinAuthorUrn: authorUrn,
-      apiEndpoint: apiEndpoint
+      apiEndpoint: apiEndpoint,
+      webhookUrl: 'https://n8n.srv930949.hstgr.cloud/webhook/publish-post'
     })
 
     // Create AbortController for timeout handling
@@ -164,6 +165,8 @@ serve(async (req) => {
         console.error('Publish webhook request timed out')
         throw new Error('Publish request timed out - please try again')
       }
+      
+      console.error('Fetch error when calling n8n webhook:', fetchError)
       throw fetchError;
     }
 
