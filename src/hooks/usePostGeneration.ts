@@ -1,8 +1,20 @@
-
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+
+// Calculate estimated processing time for user feedback
+const estimateProcessingTime = (audioBlob: Blob): number => {
+  const sizeKB = audioBlob.size / 1024;
+  const estimatedDurationSeconds = sizeKB / 1; // Rough estimate
+  const processingTimeSeconds = (estimatedDurationSeconds * 0.1) + 60;
+  return Math.max(180, Math.min(900, processingTimeSeconds * 2)); // 3-15 minutes
+};
+
+const formatProcessingTime = (seconds: number): string => {
+  const minutes = Math.round(seconds / 60);
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+};
 
 export const usePostGeneration = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -13,8 +25,8 @@ export const usePostGeneration = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [postId, setPostId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
+  const [estimatedTime, setEstimatedTime] = useState<string>('');
   
-  // Add refs to prevent infinite loops and race conditions
   const isGeneratingRef = useRef(false);
   const isPublishingRef = useRef(false);
   const lastGenerationRef = useRef<{ audioBlob: Blob | null; timestamp: number } | null>(null);
@@ -28,7 +40,6 @@ export const usePostGeneration = () => {
       if (!user) return;
       
       try {
-        // Clean up posts stuck in generating status for more than 10 minutes
         const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
         
         const { error } = await supabase
@@ -58,7 +69,13 @@ export const usePostGeneration = () => {
     console.log('Audio ready:', fileName, 'Size:', blob.size);
     setAudioBlob(blob);
     setAudioFileName(fileName);
-    // Reset status when new audio is ready
+    
+    // Calculate and display estimated processing time
+    const estimatedSeconds = estimateProcessingTime(blob);
+    const timeString = formatProcessingTime(estimatedSeconds);
+    setEstimatedTime(timeString);
+    
+    // Reset status
     setStatus('');
     setGeneratedContent('');
     setPostId(null);
@@ -67,7 +84,6 @@ export const usePostGeneration = () => {
   const generatePost = useCallback(async () => {
     console.log('generatePost called - checking conditions');
     
-    // Prevent duplicate calls and race conditions
     if (isGeneratingRef.current) {
       console.log('Already generating (ref check), skipping...');
       return;
@@ -84,7 +100,7 @@ export const usePostGeneration = () => {
       return;
     }
 
-    // Check if we're trying to generate the same audio again within 5 seconds
+    // Check for duplicate attempts
     const now = Date.now();
     if (lastGenerationRef.current && 
         lastGenerationRef.current.audioBlob === audioBlob && 
@@ -93,23 +109,25 @@ export const usePostGeneration = () => {
       return;
     }
 
-    // Update last generation reference
     lastGenerationRef.current = { audioBlob, timestamp: now };
 
-    // Set both state and ref
     isGeneratingRef.current = true;
     setIsGenerating(true);
-    setStatus('Creating post...');
+    
+    // Show estimated processing time in initial status
+    const estimatedSeconds = estimateProcessingTime(audioBlob);
+    const timeString = formatProcessingTime(estimatedSeconds);
+    setStatus(`Creating post... (estimated time: ${timeString})`);
 
     try {
       console.log('Creating new post with audio file:', audioFileName, 'Size:', audioBlob.size, 'Language:', language);
 
-      // Validate audio file size (roughly 10MB limit)
+      // Validate file size
       if (audioBlob.size > 10 * 1024 * 1024) {
         throw new Error('Audio file is too large. Please use a shorter recording (max 10MB).');
       }
 
-      // Create a new post record for authenticated user
+      // Create post record
       const { data: post, error } = await supabase
         .from('posts')
         .insert({
@@ -127,20 +145,31 @@ export const usePostGeneration = () => {
 
       console.log('Post created successfully:', post);
       setPostId(post.id);
-      setStatus('Processing audio file...');
+      setStatus(`Processing audio file... (estimated time: ${timeString})`);
 
-      // Convert audio blob to base64 for transmission
+      // Convert to base64
       const arrayBuffer = await audioBlob.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
 
-      console.log('Base64 audio length:', base64Audio.length, 'Estimated size KB:', (base64Audio.length * 3) / (4 * 1024));
+      console.log('Base64 audio prepared:', {
+        originalSize: audioBlob.size,
+        base64Length: base64Audio.length,
+        estimatedSizeKB: (base64Audio.length * 3) / (4 * 1024),
+        estimatedProcessingTime: timeString
+      });
 
-      setStatus('Generating content from audio...');
+      setStatus(`Generating content from audio... This may take ${timeString} for longer recordings.`);
 
-      console.log('Calling generate-post function with postId:', post.id, 'Language:', language, 'UserId:', user.id);
+      console.log('Calling generate-post function with enhanced parameters:', {
+        postId: post.id,
+        language,
+        userId: user.id,
+        audioSize: audioBlob.size,
+        estimatedProcessingTime: timeString
+      });
 
-      // Call the generate-post edge function with language parameter and userId
+      // Call edge function
       const { data, error: functionError } = await supabase.functions.invoke('generate-post', {
         body: {
           postId: post.id,
@@ -160,11 +189,12 @@ export const usePostGeneration = () => {
 
       if (data?.success && data?.content) {
         setGeneratedContent(data.content);
-        setStatus('Content generated successfully!');
+        const finalTime = data.processingTime ? `${Math.round(data.processingTime)}s` : timeString;
+        setStatus(`Content generated successfully! (completed in ${finalTime})`);
         
         toast({
           title: "Success",
-          description: "Post content generated successfully!",
+          description: `Post content generated successfully in ${finalTime}!`,
         });
       } else {
         throw new Error(data?.error || 'Failed to generate content');
@@ -174,7 +204,7 @@ export const usePostGeneration = () => {
       console.error('Error generating post:', error);
       setStatus('Failed to generate post');
       
-      // Update post status to failed if we have a postId
+      // Update post status if we have postId
       if (postId) {
         try {
           await supabase
@@ -186,9 +216,17 @@ export const usePostGeneration = () => {
         }
       }
       
+      // Provide more helpful error messages
+      let errorMessage = error.message;
+      if (error.message.includes('timed out')) {
+        errorMessage = `${error.message} Try recording shorter audio segments (under 5 minutes) for faster processing.`;
+      } else if (error.message.includes('LinkedIn token expired')) {
+        errorMessage = `${error.message} Please sign out and sign back in to refresh your LinkedIn connection.`;
+      }
+      
       toast({
         title: "Error",
-        description: `Failed to generate post: ${error.message}`,
+        description: `Failed to generate post: ${errorMessage}`,
         variant: "destructive"
       });
     } finally {
@@ -200,7 +238,6 @@ export const usePostGeneration = () => {
   const publishPost = useCallback(async () => {
     console.log('publishPost called - checking conditions');
     
-    // Use ref to prevent race conditions
     if (isPublishingRef.current) {
       console.log('Already publishing (ref check), skipping...');
       return;
@@ -215,7 +252,6 @@ export const usePostGeneration = () => {
       return;
     }
 
-    // Set both state and ref
     isPublishingRef.current = true;
     setIsPublishing(true);
     setStatus('Publishing to LinkedIn...');
@@ -223,7 +259,6 @@ export const usePostGeneration = () => {
     try {
       console.log('Publishing post with content length:', generatedContent.length);
 
-      // Call the publish-post edge function
       const { data, error: functionError } = await supabase.functions.invoke('publish-post', {
         body: {
           userId: user.id,
@@ -247,15 +282,15 @@ export const usePostGeneration = () => {
           description: "Post published to LinkedIn successfully!",
         });
 
-        // Clear the form for next use
+        // Clear form
         setAudioBlob(null);
         setAudioFileName('');
         setGeneratedContent('');
         setPostId(null);
         setLanguage('en-US');
         setStatus('');
+        setEstimatedTime('');
         
-        // Reset refs
         lastGenerationRef.current = null;
       } else {
         throw new Error(data?.error || 'Failed to publish post to LinkedIn');
@@ -264,7 +299,6 @@ export const usePostGeneration = () => {
     } catch (error: any) {
       console.error('Error publishing post:', error);
       
-      // Update status to failed
       if (postId) {
         await supabase
           .from('posts')
@@ -293,6 +327,7 @@ export const usePostGeneration = () => {
     isPublishing,
     postId,
     status,
+    estimatedTime,
     user,
     handleAudioReady,
     setLanguage,

@@ -15,6 +15,7 @@ export const PostGenerator = () => {
     isPublishing,
     postId,
     status,
+    estimatedTime,
     user,
     handleAudioReady,
     setLanguage,
@@ -48,6 +49,7 @@ export const PostGenerator = () => {
         isGenerating={isGenerating}
         isPublishing={isPublishing}
         status={status}
+        estimatedTime={estimatedTime}
         onAudioReady={handleAudioReady}
         onLanguageChange={setLanguage}
         onGeneratePost={generatePost}

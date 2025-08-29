@@ -3,7 +3,7 @@ import { AudioInput } from './AudioInput';
 import { LanguageSelector } from './LanguageSelector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 
 interface PostGenerationFormProps {
   audioBlob: Blob | null;
@@ -11,6 +11,7 @@ interface PostGenerationFormProps {
   isGenerating: boolean;
   isPublishing: boolean;
   status: string;
+  estimatedTime?: string;
   onAudioReady: (blob: Blob, fileName: string) => void;
   onLanguageChange: (language: string) => void;
   onGeneratePost: () => void;
@@ -22,6 +23,7 @@ export const PostGenerationForm = ({
   isGenerating,
   isPublishing,
   status,
+  estimatedTime,
   onAudioReady,
   onLanguageChange,
   onGeneratePost
@@ -43,6 +45,15 @@ export const PostGenerationForm = ({
           disabled={isGenerating || isPublishing}
         />
 
+        {audioBlob && estimatedTime && !isGenerating && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700 flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Estimated processing time: {estimatedTime}
+            </p>
+          </div>
+        )}
+
         <Button
           onClick={onGeneratePost}
           disabled={!audioBlob || isGenerating || isPublishing}
@@ -63,7 +74,7 @@ export const PostGenerationForm = ({
             <p className="text-sm flex items-center gap-2">
               {status.includes('successfully') ? (
                 <CheckCircle className="h-4 w-4 text-green-600" />
-              ) : status.includes('Failed') ? (
+              ) : status.includes('Failed') || status.includes('timed out') ? (
                 <AlertCircle className="h-4 w-4 text-red-600" />
               ) : (
                 <Loader2 className="h-4 w-4 animate-spin" />

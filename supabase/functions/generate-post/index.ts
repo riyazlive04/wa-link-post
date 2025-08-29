@@ -7,6 +7,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Calculate timeout based on audio file size and estimated duration
+function calculateTimeout(audioFileSizeKB: number): number {
+  // Base timeout of 3 minutes
+  let timeoutSeconds = 180;
+  
+  // Estimate audio duration: assume ~1KB per second of audio (rough estimate for webm)
+  const estimatedDurationSeconds = audioFileSizeKB / 1;
+  
+  console.log(`Estimated audio duration: ${estimatedDurationSeconds} seconds`);
+  
+  // Processing time estimation:
+  // - Transcription: ~0.1x realtime (very fast with Whisper)
+  // - Content generation: ~30-60 seconds regardless of audio length
+  // - Safety buffer: 2x multiplier
+  const processingTimeSeconds = (estimatedDurationSeconds * 0.1) + 60;
+  const totalTimeoutSeconds = processingTimeSeconds * 2;
+  
+  // Minimum 3 minutes, maximum 15 minutes
+  timeoutSeconds = Math.max(180, Math.min(900, totalTimeoutSeconds));
+  
+  console.log(`Calculated timeout: ${timeoutSeconds} seconds (${timeoutSeconds/60} minutes)`);
+  return timeoutSeconds * 1000; // Convert to milliseconds
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -17,7 +41,6 @@ serve(async (req) => {
   try {
     console.log('Generate post function started')
     
-    // Parse request data once and store it
     requestData = await req.json()
     console.log('Parsed request data:', {
       postId: requestData.postId,
@@ -28,7 +51,6 @@ serve(async (req) => {
       userId: requestData.userId
     })
     
-    // Use service role key to bypass RLS
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -48,15 +70,18 @@ serve(async (req) => {
       throw new Error('userId is required')
     }
 
-    // Check audio file size (base64 encoded, so roughly 4/3 of original size)
     const estimatedSizeKB = (audioFile.length * 3) / (4 * 1024)
-    console.log('Estimated audio file size:', estimatedSizeKB, 'KB')
+    console.log('Audio file analysis:', {
+      base64Length: audioFile.length,
+      estimatedSizeKB: estimatedSizeKB,
+      fileName: audioFileName
+    })
     
-    if (estimatedSizeKB > 10240) { // 10MB limit
+    if (estimatedSizeKB > 10240) {
       throw new Error('Audio file too large. Please use a shorter recording (max 10MB).')
     }
 
-    // Clean up any existing posts stuck in generating status for this user (older than 10 minutes)
+    // Clean up stuck posts
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
     console.log('Cleaning up stuck posts older than:', tenMinutesAgo)
     
@@ -76,7 +101,7 @@ serve(async (req) => {
       console.log('Cleaned up stuck posts successfully')
     }
 
-    // Update post status to generating
+    // Update post status
     console.log('Updating post status to generating...')
     const { error: updateError } = await supabase
       .from('posts')
@@ -93,7 +118,7 @@ serve(async (req) => {
 
     console.log('Post status updated successfully')
 
-    // Fetch LinkedIn access token for the user
+    // Fetch LinkedIn token
     console.log('Fetching LinkedIn token for user:', userId)
     const { data: tokenData, error: tokenError } = await supabase
       .from('linkedin_tokens')
@@ -106,7 +131,7 @@ serve(async (req) => {
       throw new Error('LinkedIn authentication required. Please connect your LinkedIn account.')
     }
 
-    // Check if token is expired
+    // Check token expiration
     const now = new Date()
     const expiresAt = new Date(tokenData.expires_at)
     
@@ -117,7 +142,7 @@ serve(async (req) => {
 
     console.log('LinkedIn token retrieved successfully')
 
-    // Prepare data for n8n webhook
+    // Prepare webhook payload
     const webhookPayload = {
       postId: postId,
       audioFile: audioFile,
@@ -127,26 +152,32 @@ serve(async (req) => {
       linkedin_person_urn: tokenData.person_urn
     }
 
-    console.log('Calling n8n webhook with payload:', {
+    // Calculate dynamic timeout
+    const timeoutDuration = calculateTimeout(estimatedSizeKB);
+
+    console.log('Calling n8n webhook with enhanced configuration:', {
       postId,
       audioFileName: audioFileName || 'recording.wav',
       audioFileSize: audioFile.length,
       estimatedSizeKB: estimatedSizeKB,
+      timeoutMinutes: timeoutDuration / (1000 * 60),
       language: language || 'en-US',
       hasLinkedinToken: !!tokenData.access_token,
       hasPersonUrn: !!tokenData.person_urn,
       webhookUrl: 'https://n8n.srv930949.hstgr.cloud/webhook/generate-post'
     })
 
-    // Create AbortController for timeout handling - increased timeout for larger files
+    // Create timeout controller
     const controller = new AbortController();
-    const timeoutDuration = estimatedSizeKB > 1000 ? 300000 : 180000; // 5 minutes for large files, 3 minutes for smaller
-    const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
-
-    console.log('Using timeout duration:', timeoutDuration / 1000, 'seconds')
+    const timeoutId = setTimeout(() => {
+      console.log(`Request timed out after ${timeoutDuration/1000} seconds`);
+      controller.abort();
+    }, timeoutDuration);
 
     try {
-      // Call n8n webhook to generate post
+      const requestStartTime = Date.now();
+      
+      // Call n8n webhook
       const webhookResponse = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/generate-post', {
         method: 'POST',
         headers: {
@@ -157,33 +188,53 @@ serve(async (req) => {
       })
 
       clearTimeout(timeoutId);
-
+      
+      const processingTime = (Date.now() - requestStartTime) / 1000;
+      console.log(`N8N webhook completed in ${processingTime} seconds`);
       console.log('N8N webhook response status:', webhookResponse.status)
       console.log('N8N webhook response headers:', Object.fromEntries(webhookResponse.headers.entries()))
       
       if (!webhookResponse.ok) {
         const errorText = await webhookResponse.text()
-        console.error('N8N webhook failed with status:', webhookResponse.status, 'Error:', errorText)
+        console.error('N8N webhook failed:', {
+          status: webhookResponse.status,
+          statusText: webhookResponse.statusText,
+          errorText: errorText,
+          processingTime: processingTime
+        })
         throw new Error(`N8N webhook failed: ${webhookResponse.status} - ${errorText}`)
       }
 
+      // Parse response
       let webhookResult;
       try {
         const responseText = await webhookResponse.text();
-        console.log('N8N raw response length:', responseText.length);
+        console.log('N8N response details:', {
+          responseLength: responseText.length,
+          processingTime: processingTime,
+          responsePreview: responseText.substring(0, 200) + (responseText.length > 200 ? '...' : '')
+        });
         
         if (!responseText.trim()) {
           throw new Error('Empty response from n8n webhook');
         }
         
         webhookResult = JSON.parse(responseText);
-        console.log('N8N parsed response success:', !!webhookResult.content || !!webhookResult.output)
+        console.log('N8N parsed response structure:', {
+          hasContent: !!webhookResult.content,
+          hasOutput: !!webhookResult.output,
+          isString: typeof webhookResult === 'string',
+          keys: Object.keys(webhookResult || {})
+        });
       } catch (parseError) {
-        console.error('Failed to parse n8n response as JSON:', parseError);
-        throw new Error('Invalid response from content generation service');
+        console.error('Failed to parse n8n response:', {
+          parseError: parseError.message,
+          processingTime: processingTime
+        });
+        throw new Error('Invalid JSON response from content generation service');
       }
 
-      // Handle different possible response formats
+      // Extract content
       let generatedContent = null;
       
       if (webhookResult?.content) {
@@ -194,12 +245,16 @@ serve(async (req) => {
         generatedContent = webhookResult;
       }
       
-      console.log('Extracted content:', generatedContent ? 'Content found' : 'No content found')
+      console.log('Content extraction result:', {
+        contentFound: !!generatedContent,
+        contentLength: generatedContent ? generatedContent.length : 0,
+        processingTime: processingTime
+      });
       
       if (generatedContent) {
         console.log('Updating post with generated content...')
         
-        // Update post with generated content
+        // Update post with content
         const { error: contentError } = await supabase
           .from('posts')
           .update({ 
@@ -214,37 +269,56 @@ serve(async (req) => {
           throw contentError
         }
 
-        console.log('Post updated successfully with generated content')
+        console.log('Post updated successfully:', {
+          postId: postId,
+          contentLength: generatedContent.length,
+          totalProcessingTime: processingTime
+        });
 
         return new Response(
           JSON.stringify({ 
             success: true, 
             content: generatedContent,
-            postId: postId
+            postId: postId,
+            processingTime: processingTime
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       } else {
-        console.error('No content found in n8n response')
-        throw new Error('N8N response does not contain expected content field')
+        console.error('No content found in n8n response after processing')
+        throw new Error('Content generation service returned no content')
       }
       
     } catch (fetchError) {
       clearTimeout(timeoutId);
       
       if (fetchError.name === 'AbortError') {
-        console.error('N8N webhook request timed out after', timeoutDuration / 1000, 'seconds')
-        throw new Error(`Request timed out - audio file may be too long or processing is taking longer than expected. Try with a shorter audio file.`)
+        const timeoutMinutes = Math.round(timeoutDuration / (1000 * 60));
+        console.error(`N8N webhook request timed out after ${timeoutMinutes} minutes for audio file:`, {
+          fileName: audioFileName,
+          sizeKB: estimatedSizeKB,
+          timeoutUsed: timeoutMinutes
+        });
+        throw new Error(`Processing timed out after ${timeoutMinutes} minutes. This may happen with very long audio files. Try breaking your audio into shorter segments (under 5 minutes each).`);
       }
       
-      console.error('Fetch error when calling n8n webhook:', fetchError)
+      console.error('Network/fetch error when calling n8n webhook:', {
+        errorName: fetchError.name,
+        errorMessage: fetchError.message,
+        audioSize: estimatedSizeKB
+      });
       throw fetchError;
     }
 
   } catch (error) {
-    console.error('Error in generate-post function:', error)
+    console.error('Error in generate-post function:', {
+      errorMessage: error.message,
+      errorStack: error.stack,
+      postId: requestData?.postId,
+      audioSize: requestData?.audioFile ? (requestData.audioFile.length * 3) / (4 * 1024) : null
+    });
     
-    // Try to update post status to failed if we have requestData
+    // Update post status to failed
     if (requestData?.postId) {
       try {
         const supabase = createClient(
