@@ -48,6 +48,34 @@ serve(async (req) => {
       throw new Error('userId is required')
     }
 
+    // Check audio file size (base64 encoded, so roughly 4/3 of original size)
+    const estimatedSizeKB = (audioFile.length * 3) / (4 * 1024)
+    console.log('Estimated audio file size:', estimatedSizeKB, 'KB')
+    
+    if (estimatedSizeKB > 10240) { // 10MB limit
+      throw new Error('Audio file too large. Please use a shorter recording (max 10MB).')
+    }
+
+    // Clean up any existing posts stuck in generating status for this user (older than 10 minutes)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+    console.log('Cleaning up stuck posts older than:', tenMinutesAgo)
+    
+    const { error: cleanupError } = await supabase
+      .from('posts')
+      .update({ 
+        status: 'failed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('status', 'generating')
+      .lt('created_at', tenMinutesAgo)
+
+    if (cleanupError) {
+      console.error('Error cleaning up stuck posts:', cleanupError)
+    } else {
+      console.log('Cleaned up stuck posts successfully')
+    }
+
     // Update post status to generating
     console.log('Updating post status to generating...')
     const { error: updateError } = await supabase
@@ -103,15 +131,19 @@ serve(async (req) => {
       postId,
       audioFileName: audioFileName || 'recording.wav',
       audioFileSize: audioFile.length,
+      estimatedSizeKB: estimatedSizeKB,
       language: language || 'en-US',
       hasLinkedinToken: !!tokenData.access_token,
       hasPersonUrn: !!tokenData.person_urn,
       webhookUrl: 'https://n8n.srv930949.hstgr.cloud/webhook/generate-post'
     })
 
-    // Create AbortController for timeout handling
+    // Create AbortController for timeout handling - increased timeout for larger files
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout
+    const timeoutDuration = estimatedSizeKB > 1000 ? 300000 : 180000; // 5 minutes for large files, 3 minutes for smaller
+    const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
+
+    console.log('Using timeout duration:', timeoutDuration / 1000, 'seconds')
 
     try {
       // Call n8n webhook to generate post
@@ -201,8 +233,8 @@ serve(async (req) => {
       clearTimeout(timeoutId);
       
       if (fetchError.name === 'AbortError') {
-        console.error('N8N webhook request timed out after 3 minutes')
-        throw new Error('Request timed out - audio file may be too long or processing is taking longer than expected')
+        console.error('N8N webhook request timed out after', timeoutDuration / 1000, 'seconds')
+        throw new Error(`Request timed out - audio file may be too long or processing is taking longer than expected. Try with a shorter audio file.`)
       }
       
       console.error('Fetch error when calling n8n webhook:', fetchError)
