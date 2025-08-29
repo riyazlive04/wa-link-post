@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,13 +17,13 @@ export const usePostGeneration = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const handleAudioReady = (blob: Blob, fileName: string) => {
+  const handleAudioReady = useCallback((blob: Blob, fileName: string) => {
     console.log('Audio ready:', fileName, 'Size:', blob.size);
     setAudioBlob(blob);
     setAudioFileName(fileName);
-  };
+  }, []);
 
-  const generatePost = async () => {
+  const generatePost = useCallback(async () => {
     console.log('generatePost called', { audioBlob: !!audioBlob, user: !!user });
     
     if (!audioBlob || !user) {
@@ -34,6 +34,11 @@ export const usePostGeneration = () => {
         description: errorMsg,
         variant: "destructive"
       });
+      return;
+    }
+
+    if (isGenerating) {
+      console.log('Already generating, skipping...');
       return;
     }
 
@@ -111,15 +116,20 @@ export const usePostGeneration = () => {
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [audioBlob, user, audioFileName, language, isGenerating, toast]);
 
-  const publishPost = async () => {
+  const publishPost = useCallback(async () => {
     if (!postId || !generatedContent || !user) {
       toast({
         title: "Error",
         description: "No post to publish or user not authenticated.",
         variant: "destructive"
       });
+      return;
+    }
+
+    if (isPublishing) {
+      console.log('Already publishing, skipping...');
       return;
     }
 
@@ -167,10 +177,12 @@ export const usePostGeneration = () => {
       console.error('Error publishing post:', error);
       
       // Update status to failed
-      await supabase
-        .from('posts')
-        .update({ status: 'failed' })
-        .eq('id', postId);
+      if (postId) {
+        await supabase
+          .from('posts')
+          .update({ status: 'failed' })
+          .eq('id', postId);
+      }
       
       setStatus('Failed to publish post');
       toast({
@@ -181,7 +193,7 @@ export const usePostGeneration = () => {
     } finally {
       setIsPublishing(false);
     }
-  };
+  }, [postId, generatedContent, user, isPublishing, toast]);
 
   return {
     audioBlob,
