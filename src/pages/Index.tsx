@@ -3,7 +3,6 @@ import { HeroSection } from "@/components/HeroSection";
 import { DashboardOverview } from "@/components/DashboardOverview";
 import { PostGenerator } from "@/components/PostGenerator";
 import { RecentPosts } from "@/components/RecentPosts";
-import { LoginPage } from "@/components/LoginPage";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
@@ -22,19 +21,23 @@ const Index = () => {
     );
   }
 
-  if (!user) {
-    return <LoginPage />;
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/5 to-accent/5">
       <Navbar />
       <HeroSection />
-      <div className="container mx-auto px-4 py-12">
-        <PostGenerator />
-      </div>
-      <DashboardOverview />
-      <RecentPosts />
+      
+      {user && (
+        <div className="container mx-auto px-4 py-12">
+          <PostGenerator />
+        </div>
+      )}
+      
+      {user && (
+        <>
+          <DashboardOverview />
+          <RecentPosts />
+        </>
+      )}
     </div>
   );
 };

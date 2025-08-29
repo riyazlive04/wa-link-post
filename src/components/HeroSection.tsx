@@ -1,25 +1,39 @@
 
 import { MessageSquare, Linkedin, Zap, ArrowRight, Sparkles, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const HeroSection = () => {
-  const scrollToPostGenerator = () => {
-    const postGeneratorSection = document.querySelector('.post-generator-section');
-    if (postGeneratorSection) {
-      postGeneratorSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const { user, signInWithLinkedIn } = useAuth();
+
+  const handleGetStarted = async () => {
+    if (!user) {
+      // User not logged in, prompt them to authenticate with LinkedIn
+      try {
+        await signInWithLinkedIn();
+      } catch (error: any) {
+        console.error('LinkedIn auth error:', error);
+      }
+    } else {
+      // User is logged in, scroll to post generator
+      const postGeneratorSection = document.querySelector('.post-generator-section');
+      if (postGeneratorSection) {
+        postGeneratorSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
   };
 
-  return <section className="section-spacing bg-gradient-to-br from-background via-primary/5 to-accent/10 relative overflow-hidden py-12 lg:py-16">
+  return (
+    <section className="section-spacing bg-gradient-to-br from-background via-primary/5 to-accent/10 relative overflow-hidden py-12 lg:py-16">
       {/* Animated background elements - reduced size */}
       <div className="absolute inset-0">
         <div className="absolute top-5 left-10 w-48 h-48 bg-primary/10 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
         <div className="absolute top-0 right-10 w-48 h-48 bg-accent/10 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse" style={{
-        animationDelay: '2s'
-      }}></div>
+          animationDelay: '2s'
+        }}></div>
         <div className="absolute -bottom-20 left-20 w-48 h-48 bg-success/10 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse" style={{
-        animationDelay: '4s'
-      }}></div>
+          animationDelay: '4s'
+        }}></div>
       </div>
 
       <div className="container-professional relative z-10">
@@ -39,8 +53,8 @@ export const HeroSection = () => {
                 </div>
                 <div className="relative">
                   <Linkedin className="h-8 w-8 text-primary animate-bounce" style={{
-                  animationDelay: '0.5s'
-                }} />
+                    animationDelay: '0.5s'
+                  }} />
                   <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-success rounded-full animate-pulse"></div>
                 </div>
               </div>
@@ -55,20 +69,29 @@ export const HeroSection = () => {
           </h1>
 
           <p className="body-large mb-8 max-w-2xl mx-auto animate-slide-up leading-relaxed text-base lg:text-lg" style={{
-          animationDelay: '0.2s'
-        }}>
+            animationDelay: '0.2s'
+          }}>
             Send a simple Voice message and watch as AI transforms your thoughts 
             into engaging, professional LinkedIn content that gets published automatically.
             <span className="block mt-2 text-primary font-medium">✨ It's like magic, but for LinkedIn!</span>
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12 animate-slide-up" style={{
-          animationDelay: '0.4s'
-        }}>
-            <Button onClick={scrollToPostGenerator} className="btn-hero group relative overflow-hidden">
+            animationDelay: '0.4s'
+          }}>
+            <Button onClick={handleGetStarted} className="btn-hero group relative overflow-hidden">
               <span className="relative z-10 flex items-center">
-                Get Started
-                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                {!user ? (
+                  <>
+                    <Linkedin className="mr-2 h-4 w-4" />
+                    Connect LinkedIn to Start
+                  </>
+                ) : (
+                  <>
+                    Get Started
+                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </>
+                )}
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-accent to-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </Button>
@@ -81,8 +104,8 @@ export const HeroSection = () => {
           {/* Enhanced feature cards - reduced spacing */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
             <div className="text-center animate-slide-up group" style={{
-            animationDelay: '0.6s'
-          }}>
+              animationDelay: '0.6s'
+            }}>
               <div className="relative w-16 h-16 mx-auto mb-4">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl rotate-6 group-hover:rotate-12 transition-transform duration-300"></div>
                 <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center backdrop-blur-sm border border-primary/20 group-hover:scale-110 transition-transform duration-300">
@@ -94,8 +117,8 @@ export const HeroSection = () => {
             </div>
 
             <div className="text-center animate-slide-up group" style={{
-            animationDelay: '0.8s'
-          }}>
+              animationDelay: '0.8s'
+            }}>
               <div className="relative w-16 h-16 mx-auto mb-4">
                 <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-success/20 rounded-2xl -rotate-6 group-hover:-rotate-12 transition-transform duration-300"></div>
                 <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-accent/10 to-success/10 flex items-center justify-center backdrop-blur-sm border border-accent/20 group-hover:scale-110 transition-transform duration-300">
@@ -107,8 +130,8 @@ export const HeroSection = () => {
             </div>
 
             <div className="text-center animate-slide-up group" style={{
-            animationDelay: '1s'
-          }}>
+              animationDelay: '1s'
+            }}>
               <div className="relative w-16 h-16 mx-auto mb-4">
                 <div className="absolute inset-0 bg-gradient-to-br from-success/20 to-primary/20 rounded-2xl rotate-3 group-hover:rotate-6 transition-transform duration-300"></div>
                 <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-success/10 to-primary/10 flex items-center justify-center backdrop-blur-sm border border-success/20 group-hover:scale-110 transition-transform duration-300">
@@ -122,5 +145,6 @@ export const HeroSection = () => {
           </div>
         </div>
       </div>
-    </section>;
+    </section>
+  );
 };

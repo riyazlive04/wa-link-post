@@ -13,19 +13,25 @@ export const usePostGeneration = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [postId, setPostId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
+  
   const { user } = useAuth();
   const { toast } = useToast();
 
   const handleAudioReady = (blob: Blob, fileName: string) => {
+    console.log('Audio ready:', fileName, 'Size:', blob.size);
     setAudioBlob(blob);
     setAudioFileName(fileName);
   };
 
   const generatePost = async () => {
+    console.log('generatePost called', { audioBlob: !!audioBlob, user: !!user });
+    
     if (!audioBlob || !user) {
+      const errorMsg = !user ? "Please sign in to generate posts." : "Please record or upload an audio file first.";
+      console.error('Generate post validation failed:', errorMsg);
       toast({
         title: "Error",
-        description: !user ? "Please sign in to generate posts." : "Please record or upload an audio file first.",
+        description: errorMsg,
         variant: "destructive"
       });
       return;
@@ -123,7 +129,7 @@ export const usePostGeneration = () => {
     try {
       console.log('Publishing post with content:', generatedContent);
 
-      // Call the publish-post edge function instead of directly calling n8n
+      // Call the publish-post edge function
       const { data, error: functionError } = await supabase.functions.invoke('publish-post', {
         body: {
           userId: user.id,
@@ -152,7 +158,7 @@ export const usePostGeneration = () => {
         setAudioFileName('');
         setGeneratedContent('');
         setPostId(null);
-        setLanguage('en-US'); // Reset to default language
+        setLanguage('en-US');
       } else {
         throw new Error(data?.error || 'Failed to publish post to LinkedIn');
       }
