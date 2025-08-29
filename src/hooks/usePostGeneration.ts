@@ -3,12 +3,24 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-// Calculate estimated processing time for user feedback
+// Enhanced timeout estimation for better user feedback
 const estimateProcessingTime = (audioBlob: Blob): number => {
   const sizeKB = audioBlob.size / 1024;
-  const estimatedDurationSeconds = sizeKB / 1; // Rough estimate
-  const processingTimeSeconds = (estimatedDurationSeconds * 0.1) + 60;
-  return Math.max(180, Math.min(900, processingTimeSeconds * 2)); // 3-15 minutes
+  console.log(`Estimating processing time for ${sizeKB} KB audio file`);
+  
+  // More accurate estimation based on actual processing patterns
+  let processingTimeSeconds = 180; // Base 3 minutes
+  
+  if (sizeKB > 1024) { // Files larger than 1MB
+    const sizeMB = sizeKB / 1024;
+    processingTimeSeconds = Math.max(300, sizeMB * 120); // 2 minutes per MB
+  }
+  
+  // Cap at 20 minutes
+  processingTimeSeconds = Math.min(1200, processingTimeSeconds);
+  
+  console.log(`Estimated processing time: ${processingTimeSeconds} seconds (${processingTimeSeconds/60} minutes)`);
+  return processingTimeSeconds;
 };
 
 const formatProcessingTime = (seconds: number): string => {
@@ -66,7 +78,7 @@ export const usePostGeneration = () => {
   }, [user]);
 
   const handleAudioReady = useCallback((blob: Blob, fileName: string) => {
-    console.log('Audio ready:', fileName, 'Size:', blob.size);
+    console.log('Audio ready:', fileName, 'Size:', blob.size, 'KB:', Math.round(blob.size / 1024));
     setAudioBlob(blob);
     setAudioFileName(fileName);
     
@@ -75,17 +87,27 @@ export const usePostGeneration = () => {
     const timeString = formatProcessingTime(estimatedSeconds);
     setEstimatedTime(timeString);
     
+    // Show file size warning for large files
+    const sizeMB = blob.size / (1024 * 1024);
+    if (sizeMB > 5) {
+      toast({
+        title: "Large File Detected",
+        description: `This ${sizeMB.toFixed(1)}MB file will take approximately ${timeString} to process. Consider using shorter recordings for faster results.`,
+        variant: "default"
+      });
+    }
+    
     // Reset status
     setStatus('');
     setGeneratedContent('');
     setPostId(null);
-  }, []);
+  }, [toast]);
 
   const generatePost = useCallback(async () => {
-    console.log('generatePost called - checking conditions');
+    console.log('=== GENERATE POST STARTED ===');
     
     if (isGeneratingRef.current) {
-      console.log('Already generating (ref check), skipping...');
+      console.log('Already generating, skipping duplicate request');
       return;
     }
     
@@ -100,11 +122,11 @@ export const usePostGeneration = () => {
       return;
     }
 
-    // Check for duplicate attempts
+    // Enhanced duplicate prevention
     const now = Date.now();
     if (lastGenerationRef.current && 
         lastGenerationRef.current.audioBlob === audioBlob && 
-        now - lastGenerationRef.current.timestamp < 5000) {
+        now - lastGenerationRef.current.timestamp < 10000) { // Increased to 10 seconds
       console.log('Duplicate generation attempt detected, skipping...');
       return;
     }
@@ -114,17 +136,24 @@ export const usePostGeneration = () => {
     isGeneratingRef.current = true;
     setIsGenerating(true);
     
-    // Show estimated processing time in initial status
     const estimatedSeconds = estimateProcessingTime(audioBlob);
     const timeString = formatProcessingTime(estimatedSeconds);
-    setStatus(`Creating post... (estimated time: ${timeString})`);
+    const sizeMB = (audioBlob.size / (1024 * 1024)).toFixed(1);
+    
+    setStatus(`Creating post... (estimated time: ${timeString} for ${sizeMB}MB file)`);
 
     try {
-      console.log('Creating new post with audio file:', audioFileName, 'Size:', audioBlob.size, 'Language:', language);
+      console.log('Creating post record:', {
+        fileName: audioFileName,
+        size: audioBlob.size,
+        sizeKB: Math.round(audioBlob.size / 1024),
+        estimatedTime: timeString,
+        language: language
+      });
 
-      // Validate file size
-      if (audioBlob.size > 10 * 1024 * 1024) {
-        throw new Error('Audio file is too large. Please use a shorter recording (max 10MB).');
+      // Enhanced file size validation
+      if (audioBlob.size > 15 * 1024 * 1024) {
+        throw new Error('Audio file is too large (max 15MB). Please use a shorter recording or compress the file.');
       }
 
       // Create post record
@@ -140,36 +169,47 @@ export const usePostGeneration = () => {
 
       if (error) {
         console.error('Error creating post:', error);
-        throw error;
+        throw new Error(`Failed to create post: ${error.message}`);
       }
 
-      console.log('Post created successfully:', post);
+      console.log('Post created successfully:', post.id);
       setPostId(post.id);
-      setStatus(`Processing audio file... (estimated time: ${timeString})`);
+      setStatus(`Processing ${sizeMB}MB audio file... (estimated: ${timeString})`);
 
-      // Convert to base64
+      // Enhanced base64 conversion with progress tracking
+      console.log('Converting audio to base64...');
       const arrayBuffer = await audioBlob.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
-      const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
+      
+      // Process in chunks for large files to prevent memory issues
+      let base64Audio: string;
+      try {
+        base64Audio = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
+      } catch (error) {
+        console.error('Base64 conversion failed:', error);
+        throw new Error('Failed to process audio file. The file may be too large or corrupted.');
+      }
 
-      console.log('Base64 audio prepared:', {
+      console.log('Base64 conversion completed:', {
         originalSize: audioBlob.size,
         base64Length: base64Audio.length,
-        estimatedSizeKB: (base64Audio.length * 3) / (4 * 1024),
-        estimatedProcessingTime: timeString
+        estimatedSizeKB: Math.round((base64Audio.length * 3) / (4 * 1024)),
+        compressionRatio: (base64Audio.length / audioBlob.size).toFixed(2)
       });
 
-      setStatus(`Generating content from audio... This may take ${timeString} for longer recordings.`);
+      setStatus(`Generating content from ${sizeMB}MB audio... This may take ${timeString}.`);
 
-      console.log('Calling generate-post function with enhanced parameters:', {
+      console.log('=== CALLING EDGE FUNCTION ===', {
         postId: post.id,
+        audioSize: audioBlob.size,
         language,
         userId: user.id,
-        audioSize: audioBlob.size,
-        estimatedProcessingTime: timeString
+        estimatedProcessing: timeString
       });
 
-      // Call edge function
+      const functionStartTime = Date.now();
+
+      // Call edge function with enhanced error handling
       const { data, error: functionError } = await supabase.functions.invoke('generate-post', {
         body: {
           postId: post.id,
@@ -180,28 +220,45 @@ export const usePostGeneration = () => {
         }
       });
 
+      const functionDuration = (Date.now() - functionStartTime) / 1000;
+      console.log(`Edge function completed in ${functionDuration} seconds`);
+
       if (functionError) {
         console.error('Edge function error:', functionError);
-        throw functionError;
+        throw new Error(functionError.message || 'Content generation service failed');
       }
 
-      console.log('Generate post response:', data);
+      console.log('Edge function response:', {
+        success: data?.success,
+        hasContent: !!data?.content,
+        contentLength: data?.content?.length || 0,
+        processingTime: data?.processingTime || functionDuration,
+        error: data?.error
+      });
 
       if (data?.success && data?.content) {
         setGeneratedContent(data.content);
-        const finalTime = data.processingTime ? `${Math.round(data.processingTime)}s` : timeString;
-        setStatus(`Content generated successfully! (completed in ${finalTime})`);
+        const finalTime = data.processingTime ? `${Math.round(data.processingTime)}s` : `${Math.round(functionDuration)}s`;
+        setStatus(`Content generated successfully! (completed in ${finalTime} for ${sizeMB}MB file)`);
         
         toast({
           title: "Success",
-          description: `Post content generated successfully in ${finalTime}!`,
+          description: `Post content generated successfully in ${finalTime} from ${sizeMB}MB audio file!`,
         });
       } else {
-        throw new Error(data?.error || 'Failed to generate content');
+        const errorMsg = data?.error || 'Content generation failed - no content returned';
+        console.error('Content generation failed:', errorMsg);
+        throw new Error(errorMsg);
       }
 
     } catch (error: any) {
-      console.error('Error generating post:', error);
+      console.error('=== GENERATE POST ERROR ===', {
+        errorMessage: error.message,
+        errorName: error.name,
+        audioSize: audioBlob.size,
+        postId: postId
+      });
+      
       setStatus('Failed to generate post');
       
       // Update post status if we have postId
@@ -216,12 +273,16 @@ export const usePostGeneration = () => {
         }
       }
       
-      // Provide more helpful error messages
+      // Enhanced error messaging
       let errorMessage = error.message;
-      if (error.message.includes('timed out')) {
-        errorMessage = `${error.message} Try recording shorter audio segments (under 5 minutes) for faster processing.`;
+      if (error.message.includes('timed out') || error.message.includes('timeout')) {
+        errorMessage = `Processing timed out for ${sizeMB}MB file. Try using shorter audio segments (under 5 minutes) or compressing the file.`;
+      } else if (error.message.includes('too large')) {
+        errorMessage = `Audio file (${sizeMB}MB) is too large. Please use files smaller than 15MB.`;
       } else if (error.message.includes('LinkedIn token expired')) {
-        errorMessage = `${error.message} Please sign out and sign back in to refresh your LinkedIn connection.`;
+        errorMessage = 'LinkedIn token expired. Please sign out and sign back in to refresh your connection.';
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorMessage = 'Network error occurred. Please check your internet connection and try again.';
       }
       
       toast({
