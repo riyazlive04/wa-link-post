@@ -28,19 +28,23 @@ function calculateTimeout(audioFileSizeKB: number): number {
   return timeoutSeconds * 1000;
 }
 
-// Process large audio in chunks if needed
+// Process large audio in chunks if needed - FIXED validation logic
 function processAudioData(audioFile: string): { success: boolean; data?: string; error?: string } {
   try {
     console.log(`Processing audio data of length: ${audioFile.length} characters`);
     
     // Check if the audio data is too large for memory processing
+    // Base64 encoding increases size by ~33%, so actual file size = base64_length * 3/4
     const estimatedSizeKB = (audioFile.length * 3) / (4 * 1024);
-    console.log(`Estimated audio size: ${estimatedSizeKB} KB`);
+    const estimatedSizeMB = estimatedSizeKB / 1024;
+    console.log(`Estimated audio size: ${estimatedSizeKB} KB (${estimatedSizeMB.toFixed(2)} MB)`);
     
-    if (estimatedSizeKB > 15360) { // 15MB limit
+    // FIXED: Use 15MB limit correctly (15 * 1024 KB = 15360 KB)
+    const maxSizeKB = 15 * 1024; // 15MB in KB
+    if (estimatedSizeKB > maxSizeKB) {
       return {
         success: false,
-        error: `Audio file too large (${Math.round(estimatedSizeKB)} KB). Please use files smaller than 15MB or shorter recordings.`
+        error: `Audio file too large (${estimatedSizeMB.toFixed(1)}MB). Please use files smaller than 15MB or shorter recordings.`
       };
     }
     
@@ -51,6 +55,16 @@ function processAudioData(audioFile: string): { success: boolean; data?: string;
         error: 'Invalid audio data format'
       };
     }
+    
+    // Additional validation for very small files (likely corrupted)
+    if (estimatedSizeKB < 1) {
+      return {
+        success: false,
+        error: 'Audio file appears to be corrupted or too small'
+      };
+    }
+    
+    console.log(`Audio validation passed: ${estimatedSizeMB.toFixed(2)}MB file (under ${maxSizeKB/1024}MB limit)`);
     
     return {
       success: true,
@@ -105,17 +119,20 @@ serve(async (req) => {
       throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
     }
 
-    // Process and validate audio data
+    // Process and validate audio data - FIXED
     console.log('Processing audio data...');
     const audioProcessResult = processAudioData(audioFile);
     if (!audioProcessResult.success) {
+      console.error('Audio processing failed:', audioProcessResult.error);
       throw new Error(audioProcessResult.error);
     }
 
     const estimatedSizeKB = (audioFile.length * 3) / (4 * 1024);
+    const estimatedSizeMB = estimatedSizeKB / 1024;
     console.log('Audio validation passed:', {
       originalLength: audioFile.length,
       estimatedSizeKB: Math.round(estimatedSizeKB),
+      estimatedSizeMB: estimatedSizeMB.toFixed(2),
       fileName: audioFileName || 'unknown'
     });
 
@@ -204,6 +221,7 @@ serve(async (req) => {
       postId: pid,
       audioFileName: audioFileName || 'recording.wav',
       estimatedSizeKB: Math.round(estimatedSizeKB),
+      estimatedSizeMB: estimatedSizeMB.toFixed(2),
       timeoutMinutes: Math.round(timeoutDuration / (1000 * 60)),
       language: language || 'en-US',
       hasLinkedinToken: !!tokenData.access_token,
