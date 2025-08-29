@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +14,10 @@ export const usePostGeneration = () => {
   const [postId, setPostId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
   
+  // Add refs to prevent infinite loops
+  const isGeneratingRef = useRef(false);
+  const isPublishingRef = useRef(false);
+  
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -24,7 +28,14 @@ export const usePostGeneration = () => {
   }, []);
 
   const generatePost = useCallback(async () => {
-    console.log('generatePost called', { audioBlob: !!audioBlob, user: !!user });
+    console.log('generatePost called - stack trace check');
+    console.trace('generatePost call stack');
+    
+    // Use ref to prevent race conditions
+    if (isGeneratingRef.current) {
+      console.log('Already generating (ref check), skipping...');
+      return;
+    }
     
     if (!audioBlob || !user) {
       const errorMsg = !user ? "Please sign in to generate posts." : "Please record or upload an audio file first.";
@@ -37,11 +48,8 @@ export const usePostGeneration = () => {
       return;
     }
 
-    if (isGenerating) {
-      console.log('Already generating, skipping...');
-      return;
-    }
-
+    // Set both state and ref
+    isGeneratingRef.current = true;
     setIsGenerating(true);
     setStatus('Creating post...');
 
@@ -114,11 +122,21 @@ export const usePostGeneration = () => {
         variant: "destructive"
       });
     } finally {
+      isGeneratingRef.current = false;
       setIsGenerating(false);
     }
-  }, [audioBlob, user, audioFileName, language, isGenerating, toast]);
+  }, [audioBlob, user, audioFileName, language, toast]);
 
   const publishPost = useCallback(async () => {
+    console.log('publishPost called - stack trace check');
+    console.trace('publishPost call stack');
+    
+    // Use ref to prevent race conditions
+    if (isPublishingRef.current) {
+      console.log('Already publishing (ref check), skipping...');
+      return;
+    }
+    
     if (!postId || !generatedContent || !user) {
       toast({
         title: "Error",
@@ -128,11 +146,8 @@ export const usePostGeneration = () => {
       return;
     }
 
-    if (isPublishing) {
-      console.log('Already publishing, skipping...');
-      return;
-    }
-
+    // Set both state and ref
+    isPublishingRef.current = true;
     setIsPublishing(true);
     setStatus('Publishing to LinkedIn...');
 
@@ -191,9 +206,10 @@ export const usePostGeneration = () => {
         variant: "destructive"
       });
     } finally {
+      isPublishingRef.current = false;
       setIsPublishing(false);
     }
-  }, [postId, generatedContent, user, isPublishing, toast]);
+  }, [postId, generatedContent, user, toast]);
 
   return {
     audioBlob,
