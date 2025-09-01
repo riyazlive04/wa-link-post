@@ -38,26 +38,71 @@ export const useN8nWebhook = (): UseN8nWebhookReturn => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data: N8nResponse = await response.json();
-      
-      if (!data.postDraft) {
-        throw new Error('No post draft received from server');
+      const responseText = await response.text();
+      console.log('N8n webhook raw response:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.log('Response is not JSON, treating as plain text content');
+        // If response is not JSON, treat it as the content itself
+        data = {
+          postDraft: responseText,
+          summary: 'Generated content from audio',
+          tokensUsed: 0
+        };
       }
 
-      console.log('N8n webhook response:', data);
+      console.log('N8n webhook parsed data:', data);
+
+      // Handle different possible response structures
+      let postContent = '';
+      if (data.postDraft) {
+        postContent = data.postDraft;
+      } else if (data.content) {
+        postContent = data.content;
+      } else if (data.output) {
+        postContent = data.output;
+      } else if (data.result) {
+        postContent = data.result;
+      } else if (typeof data === 'string') {
+        postContent = data;
+      } else {
+        // If none of the expected fields exist, try to extract any meaningful text
+        const possibleContent = Object.values(data).find(value => 
+          typeof value === 'string' && value.length > 10
+        );
+        if (possibleContent) {
+          postContent = possibleContent as string;
+        }
+      }
+
+      if (!postContent || postContent.trim().length < 10) {
+        console.error('No meaningful content found in response:', data);
+        throw new Error('No meaningful content received from server');
+      }
+
+      const result: N8nResponse = {
+        postDraft: postContent,
+        summary: data.summary || 'Generated content from audio',
+        tokensUsed: data.tokensUsed || data.tokens || 0
+      };
+
+      console.log('Final processed result:', result);
 
       toast({
         title: "Success",
         description: "Post content generated successfully!",
       });
 
-      return data;
+      return result;
 
     } catch (error: any) {
       console.error('N8n webhook error:', error);
       toast({
         title: "Error",
-        description: "Could not generate post. Please try again.",
+        description: error.message || "Could not generate post. Please try again.",
         variant: "destructive"
       });
       return null;
