@@ -22,6 +22,19 @@ export const NewPostPreview = ({
   onPublishPost,
   isPublishing = false
 }: NewPostPreviewProps) => {
+  const handlePublishClick = () => {
+    console.log('Publish button clicked');
+    console.log('onPublishPost available:', !!onPublishPost);
+    console.log('generatedContent available:', !!generatedContent);
+    
+    if (onPublishPost) {
+      console.log('Calling onPublishPost');
+      onPublishPost();
+    } else {
+      console.error('No onPublishPost function provided!');
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -62,7 +75,7 @@ export const NewPostPreview = ({
         <Button 
           className="w-full" 
           size="lg"
-          onClick={onPublishPost}
+          onClick={handlePublishClick}
           disabled={isPublishing || !generatedContent || !onPublishPost}
         >
           {isPublishing ? (

@@ -51,12 +51,28 @@ export const useNewPostGeneration = () => {
   }, [user?.id, audioFileUrl, callN8nWebhook]);
 
   const handlePublishPost = useCallback(async () => {
+    console.log('handlePublishPost called');
+    console.log('Current state:', { 
+      hasUser: !!user?.id, 
+      hasContent: !!generatedContent,
+      userId: user?.id,
+      contentLength: generatedContent?.length 
+    });
+
     if (!user?.id || !generatedContent) {
+      console.error('Missing requirements for publish:', {
+        hasUser: !!user?.id,
+        hasContent: !!generatedContent
+      });
       return;
     }
 
+    console.log('Calling publishPost...');
     const success = await publishPost(generatedContent, user.id);
+    console.log('Publish result:', success);
+    
     if (success) {
+      console.log('Clearing form after successful publish');
       // Clear the form after successful publish
       setAudioBlob(null);
       setAudioFileName('');
