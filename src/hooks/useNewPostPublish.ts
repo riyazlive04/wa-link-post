@@ -24,13 +24,13 @@ export const useNewPostPublish = () => {
     console.log('Starting publish process...');
 
     try {
-      // Create a post record first
+      // Create a post record first with correct status
       console.log('Creating post record...');
       const { data: post, error: postError } = await supabase
         .from('posts')
         .insert({
           content: content,
-          status: 'draft',
+          status: 'generated', // Use 'generated' instead of 'draft' to match database constraint
           user_id: userId
         })
         .select()
