@@ -23,7 +23,7 @@ export const useN8nWebhook = (): UseN8nWebhookReturn => {
     try {
       console.log('Calling n8n webhook with:', { userId, fileUrl });
 
-      const response = await fetch('https://my-n8n-domain.com/webhook/generate-post', {
+      const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/generate-post', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
