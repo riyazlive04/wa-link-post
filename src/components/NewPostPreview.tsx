@@ -3,20 +3,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Share2, FileText, Zap } from 'lucide-react';
+import { Share2, FileText, Zap, Loader2 } from 'lucide-react';
 
 interface NewPostPreviewProps {
   generatedContent: string;
   summary: string;
   tokensUsed: number;
   onContentChange: (content: string) => void;
+  onPublishPost?: () => void;
+  isPublishing?: boolean;
 }
 
 export const NewPostPreview = ({
   generatedContent,
   summary,
   tokensUsed,
-  onContentChange
+  onContentChange,
+  onPublishPost,
+  isPublishing = false
 }: NewPostPreviewProps) => {
   return (
     <Card>
@@ -55,9 +59,23 @@ export const NewPostPreview = ({
           />
         </div>
 
-        <Button className="w-full" size="lg">
-          <Share2 className="mr-2 h-4 w-4" />
-          Publish to LinkedIn
+        <Button 
+          className="w-full" 
+          size="lg"
+          onClick={onPublishPost}
+          disabled={isPublishing || !generatedContent || !onPublishPost}
+        >
+          {isPublishing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Publishing to LinkedIn...
+            </>
+          ) : (
+            <>
+              <Share2 className="mr-2 h-4 w-4" />
+              Publish to LinkedIn
+            </>
+          )}
         </Button>
       </CardContent>
     </Card>

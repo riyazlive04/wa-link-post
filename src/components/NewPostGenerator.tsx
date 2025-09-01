@@ -14,11 +14,13 @@ export const NewPostGenerator = () => {
     tokensUsed,
     isUploading,
     isGenerating,
+    isPublishing,
     canGenerate,
     user,
     handleAudioReady,
     setGeneratedContent,
-    generatePost
+    generatePost,
+    handlePublishPost
   } = useNewPostGeneration();
 
   if (!user) {
@@ -55,6 +57,8 @@ export const NewPostGenerator = () => {
           summary={summary}
           tokensUsed={tokensUsed}
           onContentChange={setGeneratedContent}
+          onPublishPost={handlePublishPost}
+          isPublishing={isPublishing}
         />
       )}
     </div>

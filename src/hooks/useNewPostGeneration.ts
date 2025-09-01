@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAudioUpload } from './useAudioUpload';
 import { useN8nWebhook } from './useN8nWebhook';
+import { useNewPostPublish } from './useNewPostPublish';
 
 export const useNewPostGeneration = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -15,6 +16,7 @@ export const useNewPostGeneration = () => {
   const { user } = useAuth();
   const { uploadAudio, isUploading } = useAudioUpload();
   const { callN8nWebhook, isGenerating } = useN8nWebhook();
+  const { publishPost, isPublishing } = useNewPostPublish();
 
   const handleAudioReady = useCallback(async (blob: Blob, fileName: string) => {
     console.log('Audio ready:', fileName, 'Size:', Math.round(blob.size / 1024), 'KB');
@@ -48,6 +50,23 @@ export const useNewPostGeneration = () => {
     }
   }, [user?.id, audioFileUrl, callN8nWebhook]);
 
+  const handlePublishPost = useCallback(async () => {
+    if (!user?.id || !generatedContent) {
+      return;
+    }
+
+    const success = await publishPost(generatedContent, user.id);
+    if (success) {
+      // Clear the form after successful publish
+      setAudioBlob(null);
+      setAudioFileName('');
+      setAudioFileUrl('');
+      setGeneratedContent('');
+      setSummary('');
+      setTokensUsed(0);
+    }
+  }, [user?.id, generatedContent, publishPost]);
+
   const canGenerate = !!(audioBlob && audioFileUrl && !isUploading && !isGenerating);
 
   return {
@@ -59,10 +78,12 @@ export const useNewPostGeneration = () => {
     tokensUsed,
     isUploading,
     isGenerating,
+    isPublishing,
     canGenerate,
     user,
     handleAudioReady,
     setGeneratedContent,
-    generatePost
+    generatePost,
+    handlePublishPost
   };
 };
