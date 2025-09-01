@@ -1,7 +1,7 @@
 
 import { HeroSection } from "@/components/HeroSection";
 import { DashboardOverview } from "@/components/DashboardOverview";
-import { PostGenerator } from "@/components/PostGenerator";
+import { NewPostGenerator } from "@/components/NewPostGenerator";
 import { RecentPosts } from "@/components/RecentPosts";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,7 +28,7 @@ const Index = () => {
       
       {user && (
         <div className="container mx-auto px-4 py-12">
-          <PostGenerator />
+          <NewPostGenerator />
         </div>
       )}
       
