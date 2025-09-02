@@ -39,8 +39,8 @@ export const useNewPostPublish = () => {
     }
   };
 
-  const publishPost = useCallback(async (content: string, userId: string) => {
-    console.log('publishPost called with:', { content: !!content, userId });
+  const publishPost = useCallback(async (content: string, userId: string, imageUrl?: string) => {
+    console.log('publishPost called with:', { content: !!content, userId, imageUrl: !!imageUrl });
     
     if (!content || !userId) {
       console.error('Missing required data:', { hasContent: !!content, hasUserId: !!userId });
@@ -59,12 +59,13 @@ export const useNewPostPublish = () => {
       // Validate LinkedIn connection first
       await validateLinkedInConnection(userId);
 
-      // Create a post record first with correct status
+      // Create a post record first with correct status and image URL
       console.log('Creating post record...');
       const { data: post, error: postError } = await supabase
         .from('posts')
         .insert({
           content: content,
+          image_url: imageUrl,
           status: 'generated',
           user_id: userId
         })
@@ -78,13 +79,14 @@ export const useNewPostPublish = () => {
 
       console.log('Post created successfully:', post.id);
 
-      // Call the publish edge function
+      // Call the publish edge function with image URL
       console.log('Calling publish-post edge function...');
       const { data, error: functionError } = await supabase.functions.invoke('publish-post', {
         body: {
           userId: userId,
           postId: post.id,
-          content: content
+          content: content,
+          imageUrl: imageUrl
         }
       });
 
@@ -106,7 +108,7 @@ export const useNewPostPublish = () => {
         console.log('Publish successful!');
         toast({
           title: "Success",
-          description: "Post published to LinkedIn successfully!",
+          description: imageUrl ? "Post with image published to LinkedIn successfully!" : "Post published to LinkedIn successfully!",
         });
         return true;
       } else {

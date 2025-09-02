@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -40,9 +39,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { userId, postId, content } = requestBody
+    const { userId, postId, content, imageUrl } = requestBody
 
-    console.log('Publishing post for user:', userId, 'postId:', postId)
+    console.log('Publishing post for user:', userId, 'postId:', postId, 'hasImage:', !!imageUrl)
 
     // Get LinkedIn tokens for the user
     const { data: tokenData, error: tokenError } = await supabase
@@ -68,7 +67,10 @@ serve(async (req) => {
     // Update post status to publishing
     await supabase
       .from('posts')
-      .update({ status: 'publishing' })
+      .update({ 
+        status: 'publishing',
+        image_url: imageUrl 
+      })
       .eq('id', postId)
 
     // Decrypt the access token before use
@@ -81,13 +83,14 @@ serve(async (req) => {
     
     console.log('Using UGC API with person URN:', authorUrn);
 
-    // Prepare webhook payload for n8n with decrypted token
+    // Prepare webhook payload for n8n with decrypted token and image URL
     const webhookPayload = {
       postText: content,
       linkedinToken: decryptedAccessToken,
       linkedinAuthorUrn: authorUrn,
       apiEndpoint: apiEndpoint,
       memberIdToUse: tokenData.member_id,
+      imageUrl: imageUrl,
       // Keep backward compatibility
       linkedin_person_urn: tokenData.person_urn,
       linkedinMemberId: tokenData.member_id
@@ -98,6 +101,7 @@ serve(async (req) => {
       hasContent: !!content,
       hasLinkedinToken: !!decryptedAccessToken,
       hasMemberId: !!tokenData.member_id,
+      hasImageUrl: !!imageUrl,
       memberId: tokenData.member_id,
       linkedinAuthorUrn: authorUrn,
       apiEndpoint: apiEndpoint,
@@ -150,7 +154,8 @@ serve(async (req) => {
             postUrl: linkedinPostUrl,
             linkedinPostId: webhookResult.linkedinPostId || webhookResult.id,
             usedApiEndpoint: apiEndpoint,
-            authorUrn: authorUrn
+            authorUrn: authorUrn,
+            publishedWithImage: !!imageUrl
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )

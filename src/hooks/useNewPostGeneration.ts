@@ -71,8 +71,8 @@ export const useNewPostGeneration = () => {
       return;
     }
 
-    console.log('Calling publishPost...');
-    const success = await publishPost(generatedContent, user.id);
+    console.log('Calling publishPost with imageUrl...');
+    const success = await publishPost(generatedContent, user.id, imageUrl);
     console.log('Publish result:', success);
     
     if (success) {
@@ -86,7 +86,7 @@ export const useNewPostGeneration = () => {
       setTokensUsed(0);
       setImageUrl('');
     }
-  }, [user?.id, generatedContent, publishPost]);
+  }, [user?.id, generatedContent, imageUrl, publishPost]);
 
   const canGenerate = !!(audioBlob && audioFileUrl && !isUploading && !isGenerating);
 
