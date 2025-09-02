@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Share2, FileText, Zap, Loader2, AlertTriangle, Image } from 'lucide-react';
+import { Share2, FileText, Zap, Loader2, AlertTriangle, Image, Sparkles, Upload } from 'lucide-react';
 import { LinkedInConnectionStatus } from './LinkedInConnectionStatus';
 
 interface NewPostPreviewProps {
@@ -12,6 +12,7 @@ interface NewPostPreviewProps {
   summary: string;
   tokensUsed: number;
   imageUrl?: string;
+  imageSourceType?: 'ai_generated' | 'manual_upload';
   onContentChange: (content: string) => void;
   onPublishPost?: () => void;
   isPublishing?: boolean;
@@ -22,6 +23,7 @@ export const NewPostPreview = ({
   summary,
   tokensUsed,
   imageUrl,
+  imageSourceType = 'ai_generated',
   onContentChange,
   onPublishPost,
   isPublishing = false
@@ -58,9 +60,21 @@ export const NewPostPreview = ({
               {tokensUsed} tokens used
             </Badge>
             {imageUrl && (
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Image className="h-3 w-3" />
-                Image included
+              <Badge 
+                variant={imageSourceType === 'manual_upload' ? "default" : "outline"} 
+                className="flex items-center gap-1"
+              >
+                {imageSourceType === 'manual_upload' ? (
+                  <>
+                    <Upload className="h-3 w-3" />
+                    Manual Upload
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3 w-3" />
+                    AI Generated
+                  </>
+                )}
               </Badge>
             )}
           </div>
@@ -83,11 +97,31 @@ export const NewPostPreview = ({
         {/* Generated Image Preview */}
         {imageUrl && (
           <div className="space-y-2">
-            <h4 className="text-sm font-medium">Generated Image:</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-medium">
+                {imageSourceType === 'manual_upload' ? 'Uploaded Image:' : 'Generated Image:'}
+              </h4>
+              <Badge 
+                variant={imageSourceType === 'manual_upload' ? "default" : "secondary"}
+                className="flex items-center gap-1"
+              >
+                {imageSourceType === 'manual_upload' ? (
+                  <>
+                    <Upload className="h-3 w-3" />
+                    Manual
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3 w-3" />
+                    AI
+                  </>
+                )}
+              </Badge>
+            </div>
             <div className="border rounded-lg overflow-hidden">
               <img 
                 src={imageUrl} 
-                alt="Generated content image" 
+                alt={imageSourceType === 'manual_upload' ? 'Uploaded image' : 'Generated content image'} 
                 className="w-full h-auto max-h-96 object-contain"
                 onError={(e) => {
                   console.error('Failed to load image:', imageUrl);

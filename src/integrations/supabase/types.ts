@@ -77,6 +77,7 @@ export type Database = {
           content: string | null
           created_at: string
           id: string
+          image_source_type: string | null
           image_url: string | null
           linkedin_post_id: string | null
           status: string
@@ -88,6 +89,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          image_source_type?: string | null
           image_url?: string | null
           linkedin_post_id?: string | null
           status?: string
@@ -99,6 +101,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          image_source_type?: string | null
           image_url?: string | null
           linkedin_post_id?: string | null
           status?: string

@@ -39,8 +39,13 @@ export const useNewPostPublish = () => {
     }
   };
 
-  const publishPost = useCallback(async (content: string, userId: string, imageUrl?: string) => {
-    console.log('publishPost called with:', { content: !!content, userId, imageUrl: !!imageUrl });
+  const publishPost = useCallback(async (
+    content: string, 
+    userId: string, 
+    imageUrl?: string, 
+    imageSourceType?: 'ai_generated' | 'manual_upload'
+  ) => {
+    console.log('publishPost called with:', { content: !!content, userId, imageUrl: !!imageUrl, imageSourceType });
     
     if (!content || !userId) {
       console.error('Missing required data:', { hasContent: !!content, hasUserId: !!userId });
@@ -59,13 +64,14 @@ export const useNewPostPublish = () => {
       // Validate LinkedIn connection first
       await validateLinkedInConnection(userId);
 
-      // Create a post record first with correct status and image URL
+      // Create a post record first with correct status and image data
       console.log('Creating post record...');
       const { data: post, error: postError } = await supabase
         .from('posts')
         .insert({
           content: content,
           image_url: imageUrl,
+          image_source_type: imageSourceType || 'ai_generated',
           status: 'generated',
           user_id: userId
         })
@@ -106,9 +112,13 @@ export const useNewPostPublish = () => {
 
       if (data?.success) {
         console.log('Publish successful!');
+        const successMessage = imageUrl 
+          ? `Post with ${imageSourceType === 'manual_upload' ? 'uploaded' : 'AI-generated'} image published to LinkedIn successfully!`
+          : "Post published to LinkedIn successfully!";
+          
         toast({
           title: "Success",
-          description: imageUrl ? "Post with image published to LinkedIn successfully!" : "Post published to LinkedIn successfully!",
+          description: successMessage,
         });
         return true;
       } else {
