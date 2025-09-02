@@ -31,7 +31,7 @@ export const useN8nWebhook = () => {
 
       console.log('N8N webhook payload:', payload);
 
-      const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/generate-linkedin-post', {
+      const response = await fetch('https://n8n.srv930949.hstgr.cloud/webhook/generate-post', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
