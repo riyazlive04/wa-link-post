@@ -18,10 +18,9 @@ export const LinkedInConnectionStatus = ({
   const { 
     tokenStatus, 
     isChecking, 
-    isConnecting, 
-    isRefreshing,
+    isConnecting,
     checkTokenStatus, 
-    handleReconnect
+    connectLinkedIn
   } = useLinkedInConnection();
 
   // Notify parent of connection status changes
@@ -67,9 +66,7 @@ export const LinkedInConnectionStatus = ({
 
   const statusInfo = getStatusInfo();
   const StatusIcon = statusInfo.icon;
-
-  const shouldShowReconnectButton = !tokenStatus.isConnected || tokenStatus.isExpired;
-  const shouldShowRefreshButton = tokenStatus.isConnected && tokenStatus.isExpiringSoon && !tokenStatus.isExpired;
+  const needsConnection = !tokenStatus.isConnected || tokenStatus.isExpired || tokenStatus.isExpiringSoon;
 
   const content = (
     <div className="flex items-center justify-between gap-3">
@@ -93,39 +90,15 @@ export const LinkedInConnectionStatus = ({
           size="sm"
           onClick={checkTokenStatus}
           disabled={isChecking}
+          className="flex items-center gap-1"
         >
-          {isChecking ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3 w-3" />
-          )}
+          <RefreshCw className={`h-3 w-3 ${isChecking ? 'animate-spin' : ''}`} />
+          {isChecking ? 'Checking...' : 'Check'}
         </Button>
         
-        {shouldShowRefreshButton && (
+        {needsConnection && (
           <Button
-            onClick={handleReconnect}
-            disabled={isRefreshing}
-            size="sm"
-            variant="outline"
-            className="text-yellow-600 border-yellow-300 hover:bg-yellow-50"
-          >
-            {isRefreshing ? (
-              <>
-                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-3 w-3" />
-                Refresh
-              </>
-            )}
-          </Button>
-        )}
-        
-        {shouldShowReconnectButton && (
-          <Button
-            onClick={handleReconnect}
+            onClick={connectLinkedIn}
             disabled={isConnecting}
             size="sm"
             className="bg-[#0077B5] hover:bg-[#005885]"
@@ -138,7 +111,7 @@ export const LinkedInConnectionStatus = ({
             ) : (
               <>
                 <Linkedin className="mr-2 h-3 w-3" />
-                {tokenStatus.isConnected ? 'Reconnect' : 'Connect'}
+                {tokenStatus.isConnected ? 'Reconnect' : 'Connect'} LinkedIn
               </>
             )}
           </Button>
