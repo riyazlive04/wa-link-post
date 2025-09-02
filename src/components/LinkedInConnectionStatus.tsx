@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Linkedin, AlertTriangle, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
+import { Linkedin, AlertTriangle, CheckCircle, Loader2, RefreshCw, Clock } from 'lucide-react';
 import { useLinkedInConnection } from '@/hooks/useLinkedInConnection';
 
 interface LinkedInConnectionStatusProps {
@@ -18,8 +19,9 @@ export const LinkedInConnectionStatus = ({
     tokenStatus, 
     isChecking, 
     isConnecting, 
+    isRefreshing,
     checkTokenStatus, 
-    connectLinkedIn 
+    handleReconnect
   } = useLinkedInConnection();
 
   // Notify parent of connection status changes
@@ -45,6 +47,15 @@ export const LinkedInConnectionStatus = ({
         icon: AlertTriangle
       };
     }
+
+    if (tokenStatus.isExpiringSoon) {
+      return {
+        status: 'expiring-soon',
+        message: 'LinkedIn connection expiring soon',
+        color: 'secondary' as const,
+        icon: Clock
+      };
+    }
     
     return {
       status: 'connected',
@@ -56,6 +67,9 @@ export const LinkedInConnectionStatus = ({
 
   const statusInfo = getStatusInfo();
   const StatusIcon = statusInfo.icon;
+
+  const shouldShowReconnectButton = !tokenStatus.isConnected || tokenStatus.isExpired;
+  const shouldShowRefreshButton = tokenStatus.isConnected && tokenStatus.isExpiringSoon && !tokenStatus.isExpired;
 
   const content = (
     <div className="flex items-center justify-between gap-3">
@@ -87,9 +101,31 @@ export const LinkedInConnectionStatus = ({
           )}
         </Button>
         
-        {(!tokenStatus.isConnected || tokenStatus.isExpired) && (
+        {shouldShowRefreshButton && (
           <Button
-            onClick={connectLinkedIn}
+            onClick={handleReconnect}
+            disabled={isRefreshing}
+            size="sm"
+            variant="outline"
+            className="text-yellow-600 border-yellow-300 hover:bg-yellow-50"
+          >
+            {isRefreshing ? (
+              <>
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-3 w-3" />
+                Refresh
+              </>
+            )}
+          </Button>
+        )}
+        
+        {shouldShowReconnectButton && (
+          <Button
+            onClick={handleReconnect}
             disabled={isConnecting}
             size="sm"
             className="bg-[#0077B5] hover:bg-[#005885]"

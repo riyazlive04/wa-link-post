@@ -31,17 +31,6 @@ export const useNewPostPublish = () => {
         throw new Error('LinkedIn token has expired. Please reconnect your LinkedIn account.');
       }
 
-      // Check if token expires within the next hour (safety buffer)
-      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
-      if (expiresAt <= oneHourFromNow) {
-        console.warn('LinkedIn token expires soon:', tokenData.expires_at);
-        toast({
-          title: "LinkedIn Token Expiring Soon",
-          description: "Your LinkedIn token will expire soon. Consider reconnecting after publishing.",
-          variant: "default"
-        });
-      }
-
       console.log('LinkedIn connection validated successfully');
       return true;
     } catch (error: any) {
@@ -76,7 +65,7 @@ export const useNewPostPublish = () => {
         .from('posts')
         .insert({
           content: content,
-          status: 'generated', // Use 'generated' instead of 'draft' to match database constraint
+          status: 'generated',
           user_id: userId
         })
         .select()
