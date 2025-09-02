@@ -75,7 +75,13 @@ export const useImageUpload = () => {
     }
 
     setIsUploading(true);
-    console.log('Starting upload process for:', file.name, 'Size:', Math.round(file.size / 1024), 'KB');
+    console.log('=== STARTING IMAGE UPLOAD ===');
+    console.log('File details:', {
+      name: file.name,
+      type: file.type,
+      size: `${Math.round(file.size / 1024)} KB`,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
     console.log('User ID:', userId);
 
     try {
@@ -85,8 +91,10 @@ export const useImageUpload = () => {
       
       console.log('Generated filename:', fileName);
 
-      // Try to upload to post-images bucket first, fallback to recordings
+      // Try to upload to post-images bucket first
       let uploadBucket = 'post-images';
+      console.log(`Attempting upload to ${uploadBucket} bucket...`);
+      
       let { error: uploadError } = await supabase.storage
         .from(uploadBucket)
         .upload(fileName, file, {
@@ -94,9 +102,11 @@ export const useImageUpload = () => {
           upsert: false
         });
 
-      // If post-images bucket doesn't exist, try recordings bucket
-      if (uploadError && uploadError.message.includes('not found')) {
-        console.log('post-images bucket not found, trying recordings bucket');
+      // If post-images bucket fails, try recordings bucket as fallback
+      if (uploadError) {
+        console.log(`Upload to ${uploadBucket} failed:`, uploadError);
+        console.log('Trying recordings bucket as fallback...');
+        
         uploadBucket = 'recordings';
         const fallbackResult = await supabase.storage
           .from(uploadBucket)
@@ -105,15 +115,40 @@ export const useImageUpload = () => {
             upsert: false
           });
         uploadError = fallbackResult.error;
+        
+        if (fallbackResult.error) {
+          console.error('Fallback upload to recordings also failed:', fallbackResult.error);
+        } else {
+          console.log('Successfully uploaded to recordings bucket as fallback');
+        }
+      } else {
+        console.log(`Successfully uploaded to ${uploadBucket} bucket`);
       }
 
       if (uploadError) {
-        console.error('Upload error:', uploadError);
+        console.error('=== UPLOAD ERROR ===');
+        console.error('Final upload error:', uploadError);
         console.error('Error details:', {
           message: uploadError.message,
-          name: uploadError.name
+          name: uploadError.name,
+          code: (uploadError as any).code,
+          status: (uploadError as any).status,
+          statusCode: (uploadError as any).statusCode
         });
-        throw new Error(`Failed to upload image: ${uploadError.message}`);
+        
+        // Provide more specific error messages
+        let errorMessage = uploadError.message;
+        if (uploadError.message.includes('not found')) {
+          errorMessage = 'Storage bucket not found. Please contact support.';
+        } else if (uploadError.message.includes('permission') || uploadError.message.includes('denied')) {
+          errorMessage = 'Permission denied. Please make sure you are logged in and try again.';
+        } else if (uploadError.message.includes('size') || uploadError.message.includes('large')) {
+          errorMessage = 'File too large. Please select a smaller image (max 10MB).';
+        } else if (uploadError.message.includes('type') || uploadError.message.includes('format')) {
+          errorMessage = 'Invalid file format. Please select a JPG, PNG, or WebP image.';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       // Get public URL
