@@ -36,7 +36,7 @@ export const NewPostGenerator = () => {
 
   if (!user) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 new-post-generator" data-testid="new-post-generator">
         <Card className="border-yellow-200 bg-yellow-50/50">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2 text-yellow-700">
@@ -52,7 +52,7 @@ export const NewPostGenerator = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 new-post-generator" data-testid="new-post-generator">
       <NewPostGenerationForm
         audioBlob={audioBlob}
         isUploading={isUploading}

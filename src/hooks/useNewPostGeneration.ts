@@ -45,9 +45,13 @@ export const useNewPostGeneration = () => {
 
     // Immediately upload to Supabase Storage
     if (user?.id) {
+      console.log('Uploading audio to Supabase for user:', user.id);
       const fileUrl = await uploadAudio(blob, fileName, user.id);
       if (fileUrl) {
+        console.log('Audio uploaded successfully:', fileUrl);
         setAudioFileUrl(fileUrl);
+      } else {
+        console.error('Failed to upload audio file');
       }
     }
   }, [user?.id, uploadAudio]);
@@ -59,27 +63,51 @@ export const useNewPostGeneration = () => {
   }, [user?.id, handleImageSelect]);
 
   const generatePost = useCallback(async () => {
+    console.log('Generate post called with:', {
+      hasUser: !!user?.id,
+      hasAudioFileUrl: !!audioFileUrl,
+      isGenerating,
+      isUploading,
+      isUploadingImage
+    });
+
     if (!user?.id || !audioFileUrl) {
+      console.error('Missing requirements for generation:', {
+        hasUser: !!user?.id,
+        hasAudioFileUrl: !!audioFileUrl
+      });
+      return;
+    }
+
+    if (isGenerating || isUploading || isUploadingImage) {
+      console.log('Already processing, skipping generation');
       return;
     }
 
     const imageData = getImageData();
     const shouldGenerateImage = !useManualImage; // Only generate image if not using manual upload
     
+    console.log('Calling N8N webhook with shouldGenerateImage:', shouldGenerateImage);
+    
     const result = await callN8nWebhook(user.id, audioFileUrl, shouldGenerateImage);
     if (result) {
+      console.log('N8N webhook result:', result);
       setGeneratedContent(result.postDraft);
       setSummary(result.summary || '');
       setTokensUsed(result.tokensUsed || 0);
       
       // Use manual image if available, otherwise use AI-generated image
       if (imageData.imageUrl) {
+        console.log('Using manual image:', imageData.imageUrl);
         setImageUrl(imageData.imageUrl);
       } else if (result.imageUrl) {
+        console.log('Using AI-generated image:', result.imageUrl);
         setImageUrl(result.imageUrl);
       }
+    } else {
+      console.error('Failed to generate post content');
     }
-  }, [user?.id, audioFileUrl, callN8nWebhook, getImageData, useManualImage]);
+  }, [user?.id, audioFileUrl, callN8nWebhook, getImageData, useManualImage, isGenerating, isUploading, isUploadingImage]);
 
   const handlePublishPost = useCallback(async () => {
     console.log('handlePublishPost called');

@@ -1,4 +1,3 @@
-
 import { MessageSquare, Linkedin, Zap, ArrowRight, Sparkles, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,11 +14,53 @@ export const HeroSection = () => {
         console.error('LinkedIn auth error:', error);
       }
     } else {
-      // User is logged in, scroll to post generator
-      const postGeneratorSection = document.querySelector('.post-generator-section');
-      if (postGeneratorSection) {
-        postGeneratorSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      // User is logged in, scroll to the NewPostGenerator section
+      console.log('User is logged in, scrolling to post generator');
+      
+      // Wait a bit for any pending renders to complete
+      setTimeout(() => {
+        // Try multiple selectors to find the post generator section
+        const selectors = [
+          '.new-post-generator',
+          '[data-testid="new-post-generator"]',
+          'div[class*="space-y-6"]:has(.post-generator)',
+          '.container .space-y-6:first-child'
+        ];
+        
+        let targetElement = null;
+        for (const selector of selectors) {
+          targetElement = document.querySelector(selector);
+          if (targetElement) {
+            console.log('Found target element with selector:', selector);
+            break;
+          }
+        }
+        
+        // Fallback: scroll to any element that contains "Generate LinkedIn Post"
+        if (!targetElement) {
+          const allElements = document.querySelectorAll('*');
+          for (const element of allElements) {
+            if (element.textContent?.includes('Generate LinkedIn Post')) {
+              targetElement = element.closest('.space-y-6') || element.closest('div');
+              console.log('Found target element by text content');
+              break;
+            }
+          }
+        }
+        
+        if (targetElement) {
+          targetElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start',
+            inline: 'nearest'
+          });
+          console.log('Scrolled to target element');
+        } else {
+          console.warn('Could not find post generator section to scroll to');
+          // Fallback: scroll down a bit
+          window.scrollBy({ top: 600, behavior: 'smooth' });
+        }
+      }, 100);
     }
   };
 
