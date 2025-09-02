@@ -48,12 +48,34 @@ export const useN8nWebhook = () => {
       const result = await response.json();
       console.log('N8N webhook response:', result);
 
-      return {
-        postDraft: result.postDraft || result.content || '',
-        summary: result.summary || '',
-        tokensUsed: result.tokensUsed || 0,
-        imageUrl: shouldGenerateImage ? (result.imageUrl || '') : ''
+      // Handle array response format from N8N
+      let responseData;
+      if (Array.isArray(result) && result.length > 0) {
+        console.log('N8N response is array, using first item:', result[0]);
+        responseData = result[0];
+      } else if (result && typeof result === 'object') {
+        console.log('N8N response is direct object:', result);
+        responseData = result;
+      } else {
+        console.error('Unexpected N8N response format:', result);
+        throw new Error('Invalid response format from N8N webhook');
+      }
+
+      // Validate that we have the required data
+      if (!responseData.postDraft && !responseData.content) {
+        console.error('No post content found in response:', responseData);
+        throw new Error('No post content generated');
+      }
+
+      const finalResult = {
+        postDraft: responseData.postDraft || responseData.content || '',
+        summary: responseData.summary || '',
+        tokensUsed: responseData.tokensUsed || 0,
+        imageUrl: shouldGenerateImage ? (responseData.imageUrl || '') : ''
       };
+
+      console.log('Processed N8N response:', finalResult);
+      return finalResult;
 
     } catch (error: any) {
       console.error('N8N webhook error:', error);
