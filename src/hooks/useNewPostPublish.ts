@@ -7,6 +7,49 @@ export const useNewPostPublish = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const { toast } = useToast();
 
+  const validateLinkedInConnection = async (userId: string) => {
+    console.log('Validating LinkedIn connection for user:', userId);
+    
+    try {
+      const { data: tokenData, error } = await supabase
+        .from('linkedin_tokens')
+        .select('access_token, expires_at, member_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (error || !tokenData) {
+        console.error('No LinkedIn tokens found:', error);
+        throw new Error('LinkedIn account not connected. Please connect your LinkedIn account first.');
+      }
+
+      // Check if token is expired
+      const now = new Date();
+      const expiresAt = new Date(tokenData.expires_at);
+      
+      if (now >= expiresAt) {
+        console.error('LinkedIn token expired:', tokenData.expires_at);
+        throw new Error('LinkedIn token has expired. Please reconnect your LinkedIn account.');
+      }
+
+      // Check if token expires within the next hour (safety buffer)
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+      if (expiresAt <= oneHourFromNow) {
+        console.warn('LinkedIn token expires soon:', tokenData.expires_at);
+        toast({
+          title: "LinkedIn Token Expiring Soon",
+          description: "Your LinkedIn token will expire soon. Consider reconnecting after publishing.",
+          variant: "default"
+        });
+      }
+
+      console.log('LinkedIn connection validated successfully');
+      return true;
+    } catch (error: any) {
+      console.error('LinkedIn validation error:', error);
+      throw error;
+    }
+  };
+
   const publishPost = useCallback(async (content: string, userId: string) => {
     console.log('publishPost called with:', { content: !!content, userId });
     
@@ -24,6 +67,9 @@ export const useNewPostPublish = () => {
     console.log('Starting publish process...');
 
     try {
+      // Validate LinkedIn connection first
+      await validateLinkedInConnection(userId);
+
       // Create a post record first with correct status
       console.log('Creating post record...');
       const { data: post, error: postError } = await supabase
@@ -57,6 +103,13 @@ export const useNewPostPublish = () => {
 
       if (functionError) {
         console.error('Edge function error:', functionError);
+        
+        // Handle specific LinkedIn authentication errors
+        if (functionError.message?.includes('LinkedIn authentication required') || 
+            functionError.message?.includes('token expired')) {
+          throw new Error('LinkedIn authentication expired. Please reconnect your LinkedIn account and try again.');
+        }
+        
         throw functionError;
       }
 
@@ -69,16 +122,39 @@ export const useNewPostPublish = () => {
         return true;
       } else {
         console.error('Publish failed:', data);
-        throw new Error(data?.error || 'Failed to publish post');
+        
+        // Handle specific error cases
+        let errorMessage = data?.error || 'Failed to publish post';
+        
+        if (errorMessage.includes('token') || errorMessage.includes('authentication')) {
+          errorMessage = 'LinkedIn authentication failed. Please reconnect your LinkedIn account.';
+        } else if (errorMessage.includes('LinkedIn')) {
+          errorMessage = `LinkedIn Error: ${errorMessage}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
     } catch (error: any) {
       console.error('Publish error:', error);
-      toast({
-        title: "Error",
-        description: `Failed to publish post: ${error.message}`,
-        variant: "destructive"
-      });
+      
+      let errorMessage = error.message || 'Failed to publish post';
+      
+      // Provide helpful error messages based on error type
+      if (errorMessage.includes('LinkedIn authentication') || errorMessage.includes('token')) {
+        toast({
+          title: "LinkedIn Connection Required",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to publish post: ${errorMessage}`,
+          variant: "destructive"
+        });
+      }
+      
       return false;
     } finally {
       setIsPublishing(false);

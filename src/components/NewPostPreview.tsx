@@ -1,9 +1,11 @@
 
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Share2, FileText, Zap, Loader2 } from 'lucide-react';
+import { Share2, FileText, Zap, Loader2, AlertTriangle } from 'lucide-react';
+import { LinkedInConnectionStatus } from './LinkedInConnectionStatus';
 
 interface NewPostPreviewProps {
   generatedContent: string;
@@ -22,10 +24,13 @@ export const NewPostPreview = ({
   onPublishPost,
   isPublishing = false
 }: NewPostPreviewProps) => {
+  const [isLinkedInConnected, setIsLinkedInConnected] = React.useState(false);
+
   const handlePublishClick = () => {
     console.log('Publish button clicked');
     console.log('onPublishPost available:', !!onPublishPost);
     console.log('generatedContent available:', !!generatedContent);
+    console.log('LinkedIn connected:', isLinkedInConnected);
     
     if (onPublishPost) {
       console.log('Calling onPublishPost');
@@ -34,6 +39,8 @@ export const NewPostPreview = ({
       console.error('No onPublishPost function provided!');
     }
   };
+
+  const canPublish = generatedContent && onPublishPost && isLinkedInConnected && !isPublishing;
 
   return (
     <Card>
@@ -52,6 +59,12 @@ export const NewPostPreview = ({
         )}
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* LinkedIn Connection Status */}
+        <LinkedInConnectionStatus 
+          showCard={false}
+          onConnectionChange={setIsLinkedInConnected}
+        />
+
         {summary && (
           <div className="p-3 bg-muted rounded-lg">
             <h4 className="text-sm font-medium mb-1">Summary:</h4>
@@ -72,11 +85,20 @@ export const NewPostPreview = ({
           />
         </div>
 
+        {!isLinkedInConnected && (
+          <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            <p className="text-sm text-yellow-700">
+              Please connect your LinkedIn account to publish posts.
+            </p>
+          </div>
+        )}
+
         <Button 
           className="w-full" 
           size="lg"
           onClick={handlePublishClick}
-          disabled={isPublishing || !generatedContent || !onPublishPost}
+          disabled={!canPublish}
         >
           {isPublishing ? (
             <>
@@ -86,7 +108,7 @@ export const NewPostPreview = ({
           ) : (
             <>
               <Share2 className="mr-2 h-4 w-4" />
-              Publish to LinkedIn
+              {!isLinkedInConnected ? 'Connect LinkedIn to Publish' : 'Publish to LinkedIn'}
             </>
           )}
         </Button>

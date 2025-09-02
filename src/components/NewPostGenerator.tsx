@@ -1,6 +1,7 @@
 
 import { NewPostGenerationForm } from './NewPostGenerationForm';
 import { NewPostPreview } from './NewPostPreview';
+import { LinkedInConnectionStatus } from './LinkedInConnectionStatus';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { useNewPostGeneration } from '@/hooks/useNewPostGeneration';
@@ -42,6 +43,9 @@ export const NewPostGenerator = () => {
 
   return (
     <div className="space-y-6 post-generator-section">
+      {/* LinkedIn Connection Status */}
+      <LinkedInConnectionStatus />
+
       <NewPostGenerationForm
         audioBlob={audioBlob}
         isUploading={isUploading}
