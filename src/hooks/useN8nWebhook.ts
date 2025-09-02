@@ -4,8 +4,9 @@ import { useToast } from '@/hooks/use-toast';
 
 interface N8nResponse {
   postDraft: string;
-  summary: string;
-  tokensUsed: number;
+  summary?: string;
+  tokensUsed?: number;
+  imageUrl?: string;
 }
 
 interface UseN8nWebhookReturn {
@@ -56,6 +57,12 @@ export const useN8nWebhook = (): UseN8nWebhookReturn => {
 
       console.log('N8n webhook parsed data:', data);
 
+      // Handle array response - take the first element
+      if (Array.isArray(data) && data.length > 0) {
+        console.log('Response is an array, taking first element');
+        data = data[0];
+      }
+
       // Handle different possible response structures
       let postContent = '';
       if (data.postDraft) {
@@ -86,14 +93,15 @@ export const useN8nWebhook = (): UseN8nWebhookReturn => {
       const result: N8nResponse = {
         postDraft: postContent,
         summary: data.summary || 'Generated content from audio',
-        tokensUsed: data.tokensUsed || data.tokens || 0
+        tokensUsed: data.tokensUsed || data.tokens || 0,
+        imageUrl: data.imageUrl || undefined
       };
 
       console.log('Final processed result:', result);
 
       toast({
         title: "Success",
-        description: "Post content generated successfully!",
+        description: data.imageUrl ? "Post content and image generated successfully!" : "Post content generated successfully!",
       });
 
       return result;

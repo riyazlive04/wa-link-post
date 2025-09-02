@@ -13,6 +13,7 @@ export const NewPostGenerator = () => {
     generatedContent,
     summary,
     tokensUsed,
+    imageUrl,
     isUploading,
     isGenerating,
     isPublishing,
@@ -60,6 +61,7 @@ export const NewPostGenerator = () => {
           generatedContent={generatedContent}
           summary={summary}
           tokensUsed={tokensUsed}
+          imageUrl={imageUrl}
           onContentChange={setGeneratedContent}
           onPublishPost={handlePublishPost}
           isPublishing={isPublishing}

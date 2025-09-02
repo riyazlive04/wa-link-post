@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Share2, FileText, Zap, Loader2, AlertTriangle } from 'lucide-react';
+import { Share2, FileText, Zap, Loader2, AlertTriangle, Image } from 'lucide-react';
 import { LinkedInConnectionStatus } from './LinkedInConnectionStatus';
 
 interface NewPostPreviewProps {
   generatedContent: string;
   summary: string;
   tokensUsed: number;
+  imageUrl?: string;
   onContentChange: (content: string) => void;
   onPublishPost?: () => void;
   isPublishing?: boolean;
@@ -20,6 +21,7 @@ export const NewPostPreview = ({
   generatedContent,
   summary,
   tokensUsed,
+  imageUrl,
   onContentChange,
   onPublishPost,
   isPublishing = false
@@ -55,6 +57,12 @@ export const NewPostPreview = ({
               <Zap className="h-3 w-3" />
               {tokensUsed} tokens used
             </Badge>
+            {imageUrl && (
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Image className="h-3 w-3" />
+                Image included
+              </Badge>
+            )}
           </div>
         )}
       </CardHeader>
@@ -69,6 +77,24 @@ export const NewPostPreview = ({
           <div className="p-3 bg-muted rounded-lg">
             <h4 className="text-sm font-medium mb-1">Summary:</h4>
             <p className="text-sm text-muted-foreground">{summary}</p>
+          </div>
+        )}
+
+        {/* Generated Image Preview */}
+        {imageUrl && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium">Generated Image:</h4>
+            <div className="border rounded-lg overflow-hidden">
+              <img 
+                src={imageUrl} 
+                alt="Generated content image" 
+                className="w-full h-auto max-h-96 object-contain"
+                onError={(e) => {
+                  console.error('Failed to load image:', imageUrl);
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
           </div>
         )}
 

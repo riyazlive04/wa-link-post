@@ -12,6 +12,7 @@ export const useNewPostGeneration = () => {
   const [generatedContent, setGeneratedContent] = useState<string>('');
   const [summary, setSummary] = useState<string>('');
   const [tokensUsed, setTokensUsed] = useState<number>(0);
+  const [imageUrl, setImageUrl] = useState<string>('');
   
   const { user } = useAuth();
   const { uploadAudio, isUploading } = useAudioUpload();
@@ -27,6 +28,7 @@ export const useNewPostGeneration = () => {
     setGeneratedContent('');
     setSummary('');
     setTokensUsed(0);
+    setImageUrl('');
 
     // Immediately upload to Supabase Storage
     if (user?.id) {
@@ -45,8 +47,9 @@ export const useNewPostGeneration = () => {
     const result = await callN8nWebhook(user.id, audioFileUrl);
     if (result) {
       setGeneratedContent(result.postDraft);
-      setSummary(result.summary);
-      setTokensUsed(result.tokensUsed);
+      setSummary(result.summary || '');
+      setTokensUsed(result.tokensUsed || 0);
+      setImageUrl(result.imageUrl || '');
     }
   }, [user?.id, audioFileUrl, callN8nWebhook]);
 
@@ -55,6 +58,7 @@ export const useNewPostGeneration = () => {
     console.log('Current state:', { 
       hasUser: !!user?.id, 
       hasContent: !!generatedContent,
+      hasImage: !!imageUrl,
       userId: user?.id,
       contentLength: generatedContent?.length 
     });
@@ -80,6 +84,7 @@ export const useNewPostGeneration = () => {
       setGeneratedContent('');
       setSummary('');
       setTokensUsed(0);
+      setImageUrl('');
     }
   }, [user?.id, generatedContent, publishPost]);
 
@@ -92,6 +97,7 @@ export const useNewPostGeneration = () => {
     generatedContent,
     summary,
     tokensUsed,
+    imageUrl,
     isUploading,
     isGenerating,
     isPublishing,
