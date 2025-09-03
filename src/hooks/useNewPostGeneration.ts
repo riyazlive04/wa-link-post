@@ -6,6 +6,7 @@ import { useN8nWebhook } from './useN8nWebhook';
 import { useNewPostPublish } from './useNewPostPublish';
 import { useManualImageUpload } from './useManualImageUpload';
 import { usePostScheduling } from './usePostScheduling';
+import { useImageProcessor } from './useImageProcessor';
 
 export const useNewPostGeneration = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -33,6 +34,8 @@ export const useNewPostGeneration = () => {
     resetImageState,
     getImageData
   } = useManualImageUpload();
+  
+  const { processedImageUrl } = useImageProcessor(imageUrl);
 
   const handleAudioReady = useCallback(async (blob: Blob, fileName: string) => {
     console.log('Audio ready:', fileName, 'Size:', Math.round(blob.size / 1024), 'KB');
@@ -187,7 +190,7 @@ export const useNewPostGeneration = () => {
     generatedContent,
     summary,
     tokensUsed,
-    imageUrl: getImageData().imageUrl || imageUrl, // Return manual image if available, otherwise AI-generated
+    imageUrl: getImageData().imageUrl || processedImageUrl || imageUrl, // Return manual image if available, otherwise processed AI-generated
     imageSourceType: getImageData().imageSourceType,
     isUploading,
     isGenerating,

@@ -10,6 +10,7 @@ import { SchedulingOptions } from './SchedulingOptions';
 import { ScheduleDialog } from './ScheduleDialog';
 import { usePostScheduling } from '@/hooks/usePostScheduling';
 import { useLinkedInConnection } from '@/hooks/useLinkedInConnection';
+import { useImageProcessor } from '@/hooks/useImageProcessor';
 
 interface NewPostPreviewProps {
   generatedContent: string;
@@ -48,6 +49,8 @@ export const NewPostPreview = ({
     savePostAsDraft,
     schedulePost,
   } = usePostScheduling();
+  
+  const { processedImageUrl, isProcessingImage, imageProcessingError } = useImageProcessor(imageUrl);
 
   React.useEffect(() => {
     const checkConnection = async () => {
@@ -176,15 +179,32 @@ export const NewPostPreview = ({
               </Badge>
             </div>
             <div className="border rounded-lg overflow-hidden">
-              <img 
-                src={imageUrl} 
-                alt={imageSourceType === 'manual_upload' ? 'Uploaded image' : 'Generated content image'} 
-                className="w-full h-auto max-h-96 object-contain"
-                onError={(e) => {
-                  console.error('Failed to load image:', imageUrl);
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+              {isProcessingImage ? (
+                <div className="flex items-center justify-center h-48 bg-muted">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="ml-2 text-sm text-muted-foreground">Processing image...</span>
+                </div>
+              ) : imageProcessingError ? (
+                <div className="flex items-center justify-center h-48 bg-muted">
+                  <AlertTriangle className="h-6 w-6 text-yellow-600" />
+                  <span className="ml-2 text-sm text-muted-foreground">Failed to load image</span>
+                </div>
+              ) : processedImageUrl ? (
+                <img 
+                  src={processedImageUrl} 
+                  alt={imageSourceType === 'manual_upload' ? 'Uploaded image' : 'Generated content image'} 
+                  className="w-full h-auto max-h-96 object-contain"
+                  onError={(e) => {
+                    console.error('Failed to load processed image:', processedImageUrl);
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-48 bg-muted">
+                  <Image className="h-6 w-6 text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">No image available</span>
+                </div>
+              )}
             </div>
           </div>
         )}
