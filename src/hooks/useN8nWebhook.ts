@@ -133,25 +133,34 @@ export const useN8nWebhook = () => {
       
       // Handle different image formats from n8n
       if (shouldGenerateImage) {
+        console.log('🖼️ Processing image data from n8n. Raw response imageUrl:', responseData.imageUrl);
+        console.log('🖼️ Processing image data from n8n. Raw response imageData:', responseData.imageData);
+        
         // Check if imageUrl is metadata instead of actual URL
         if (responseData.imageUrl && typeof responseData.imageUrl === 'string') {
           try {
             const parsed = JSON.parse(responseData.imageUrl);
             if (parsed && typeof parsed === 'object' && parsed.mimeType) {
-              console.log('ImageUrl contains metadata, treating as imageData');
+              console.log('🚨 ImageUrl contains metadata, treating as imageData:', parsed);
               imageUrl = await saveImageDataToSupabase(parsed, userId) || '';
+              console.log('💾 Saved metadata as image, got URL:', imageUrl);
             } else {
               // It's a regular URL string
+              console.log('✅ Using direct image URL from n8n:', responseData.imageUrl);
               imageUrl = responseData.imageUrl;
             }
           } catch {
             // Not JSON, treat as regular URL
+            console.log('✅ Using direct image URL (not JSON):', responseData.imageUrl);
             imageUrl = responseData.imageUrl;
           }
         } else if (responseData.imageData && typeof responseData.imageData === 'object') {
           // New JSON format - save to Supabase
-          console.log('Processing image data as JSON from n8n');
+          console.log('🔄 Processing image data as JSON from n8n:', responseData.imageData);
           imageUrl = await saveImageDataToSupabase(responseData.imageData, userId) || '';
+          console.log('💾 Saved image data to Supabase, got URL:', imageUrl);
+        } else {
+          console.log('⚠️ No valid image data found in n8n response');
         }
       }
 

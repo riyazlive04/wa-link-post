@@ -90,7 +90,10 @@ export const useImageProcessor = (imageUrl?: string) => {
   }, [extractBucketAndPath]);
 
   const processImage = useCallback(async (url: string) => {
+    console.log('🖼️ Processing image URL:', url);
+    
     if (!url) {
+      console.log('🖼️ No URL provided, clearing image state');
       setProcessedImage({ url: '', isLoading: false, error: null });
       return;
     }
@@ -99,23 +102,25 @@ export const useImageProcessor = (imageUrl?: string) => {
 
     try {
       if (isMetadataObject(url)) {
-        console.log('Detected metadata object instead of URL:', url);
+        console.log('🚨 Detected metadata object instead of URL:', url);
         setProcessedImage({
           url: '',
           isLoading: false,
-          error: 'Invalid image data - metadata detected instead of URL'
+          error: 'Invalid image data - received metadata instead of image URL'
         });
       } else if (isSupabaseJsonUrl(url)) {
-        console.log('Processing JSON image URL:', url);
+        console.log('🔄 Processing Supabase JSON image URL:', url);
         const actualImageUrl = await processJsonImageData(url);
         
         if (actualImageUrl) {
+          console.log('✅ Successfully extracted image URL from JSON:', actualImageUrl);
           setProcessedImage({
             url: actualImageUrl,
             isLoading: false,
             error: null
           });
         } else {
+          console.log('❌ Failed to extract image URL from JSON');
           setProcessedImage({
             url: '',
             isLoading: false,
@@ -124,6 +129,7 @@ export const useImageProcessor = (imageUrl?: string) => {
         }
       } else {
         // Direct image URL - use as is
+        console.log('✅ Using direct image URL:', url);
         setProcessedImage({
           url: url,
           isLoading: false,
@@ -131,14 +137,14 @@ export const useImageProcessor = (imageUrl?: string) => {
         });
       }
     } catch (error) {
-      console.error('Error processing image:', error);
+      console.error('❌ Error processing image:', error);
       setProcessedImage({
         url: '',
         isLoading: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
-  }, [isSupabaseJsonUrl, processJsonImageData]);
+  }, [isSupabaseJsonUrl, processJsonImageData, isMetadataObject]);
 
   useEffect(() => {
     if (imageUrl) {

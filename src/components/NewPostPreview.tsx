@@ -185,9 +185,14 @@ export const NewPostPreview = ({
                   <span className="ml-2 text-sm text-muted-foreground">Processing image...</span>
                 </div>
               ) : imageProcessingError ? (
-                <div className="flex items-center justify-center h-48 bg-muted">
-                  <AlertTriangle className="h-6 w-6 text-yellow-600" />
-                  <span className="ml-2 text-sm text-muted-foreground">Failed to load image</span>
+                <div className="flex flex-col items-center justify-center h-48 bg-muted p-4">
+                  <AlertTriangle className="h-6 w-6 text-yellow-600 mb-2" />
+                  <span className="text-sm text-muted-foreground text-center">
+                    Failed to load image: {imageProcessingError}
+                  </span>
+                  <span className="text-xs text-muted-foreground mt-1 text-center">
+                    Debug info: {imageUrl ? `Source: ${imageUrl.substring(0, 100)}${imageUrl.length > 100 ? '...' : ''}` : 'No image URL'}
+                  </span>
                 </div>
               ) : processedImageUrl ? (
                 <img 
