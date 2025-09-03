@@ -18,6 +18,15 @@ export const useImageProcessor = (imageUrl?: string) => {
     return url.includes('supabase.co') && url.includes('.json');
   }, []);
 
+  const isMetadataObject = useCallback((url: string): boolean => {
+    try {
+      const parsed = JSON.parse(url);
+      return parsed && typeof parsed === 'object' && parsed.mimeType;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const extractBucketAndPath = useCallback((url: string): { bucket: string; path: string } | null => {
     try {
       const urlObj = new URL(url);
@@ -89,7 +98,14 @@ export const useImageProcessor = (imageUrl?: string) => {
     setProcessedImage(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      if (isSupabaseJsonUrl(url)) {
+      if (isMetadataObject(url)) {
+        console.log('Detected metadata object instead of URL:', url);
+        setProcessedImage({
+          url: '',
+          isLoading: false,
+          error: 'Invalid image data - metadata detected instead of URL'
+        });
+      } else if (isSupabaseJsonUrl(url)) {
         console.log('Processing JSON image URL:', url);
         const actualImageUrl = await processJsonImageData(url);
         
@@ -136,6 +152,7 @@ export const useImageProcessor = (imageUrl?: string) => {
     processedImageUrl: processedImage.url,
     isProcessingImage: processedImage.isLoading,
     imageProcessingError: processedImage.error,
-    processImage: useCallback((url: string) => processImage(url), [processImage])
+    processImage: useCallback((url: string) => processImage(url), [processImage]),
+    isMetadataObject
   };
 };

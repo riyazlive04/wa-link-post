@@ -133,13 +133,25 @@ export const useN8nWebhook = () => {
       
       // Handle different image formats from n8n
       if (shouldGenerateImage) {
-        if (responseData.imageData && typeof responseData.imageData === 'object') {
+        // Check if imageUrl is metadata instead of actual URL
+        if (responseData.imageUrl && typeof responseData.imageUrl === 'string') {
+          try {
+            const parsed = JSON.parse(responseData.imageUrl);
+            if (parsed && typeof parsed === 'object' && parsed.mimeType) {
+              console.log('ImageUrl contains metadata, treating as imageData');
+              imageUrl = await saveImageDataToSupabase(parsed, userId) || '';
+            } else {
+              // It's a regular URL string
+              imageUrl = responseData.imageUrl;
+            }
+          } catch {
+            // Not JSON, treat as regular URL
+            imageUrl = responseData.imageUrl;
+          }
+        } else if (responseData.imageData && typeof responseData.imageData === 'object') {
           // New JSON format - save to Supabase
           console.log('Processing image data as JSON from n8n');
           imageUrl = await saveImageDataToSupabase(responseData.imageData, userId) || '';
-        } else if (responseData.imageUrl) {
-          // Legacy URL format
-          imageUrl = responseData.imageUrl;
         }
       }
 
