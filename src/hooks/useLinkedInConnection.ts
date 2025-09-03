@@ -122,14 +122,10 @@ export const useLinkedInConnection = () => {
 
   // Check token status on mount and when user changes
   useEffect(() => {
-    checkTokenStatus();
-  }, [checkTokenStatus]);
-
-  // Check token status every 5 minutes
-  useEffect(() => {
-    const interval = setInterval(checkTokenStatus, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [checkTokenStatus]);
+    if (user?.id) {
+      checkTokenStatus();
+    }
+  }, [user?.id]); // Only depend on user.id, not the callback
 
   return {
     tokenStatus,

@@ -3,6 +3,19 @@ import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+// Global reference for triggering LinkedIn token status check from other hooks
+let triggerLinkedInCheck: (() => void) | null = null;
+
+export const setLinkedInCheckTrigger = (callback: () => void) => {
+  triggerLinkedInCheck = callback;
+};
+
+const triggerLinkedInTokenCheck = () => {
+  if (triggerLinkedInCheck) {
+    triggerLinkedInCheck();
+  }
+};
+
 export const useNewPostPublish = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const { toast } = useToast();
@@ -106,6 +119,7 @@ export const useNewPostPublish = () => {
         // Handle specific LinkedIn authentication errors
         if (functionError.message?.includes('LinkedIn authentication required') || 
             functionError.message?.includes('token expired')) {
+          triggerLinkedInTokenCheck(); // Trigger token status check
           throw new Error('LinkedIn authentication expired. Please reconnect your LinkedIn account and try again.');
         }
         
@@ -130,6 +144,7 @@ export const useNewPostPublish = () => {
         let errorMessage = data?.error || 'Failed to publish post';
         
         if (errorMessage.includes('token') || errorMessage.includes('authentication')) {
+          triggerLinkedInTokenCheck(); // Trigger token status check
           errorMessage = 'LinkedIn authentication failed. Please reconnect your LinkedIn account.';
         } else if (errorMessage.includes('LinkedIn')) {
           errorMessage = `LinkedIn Error: ${errorMessage}`;
@@ -145,6 +160,7 @@ export const useNewPostPublish = () => {
       
       // Provide helpful error messages based on error type
       if (errorMessage.includes('LinkedIn authentication') || errorMessage.includes('token')) {
+        triggerLinkedInTokenCheck(); // Trigger token status check
         toast({
           title: "LinkedIn Connection Required",
           description: errorMessage,

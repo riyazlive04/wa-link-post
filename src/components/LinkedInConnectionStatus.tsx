@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Linkedin, AlertTriangle, CheckCircle, Loader2, RefreshCw, Clock } from 'lucide-react';
 import { useLinkedInConnection } from '@/hooks/useLinkedInConnection';
+import { setLinkedInCheckTrigger } from '@/hooks/useNewPostPublish';
 
 interface LinkedInConnectionStatusProps {
   showCard?: boolean;
@@ -22,6 +23,11 @@ export const LinkedInConnectionStatus = ({
     checkTokenStatus, 
     connectLinkedIn
   } = useLinkedInConnection();
+
+  // Set up the trigger for manual token checking from other hooks
+  React.useEffect(() => {
+    setLinkedInCheckTrigger(checkTokenStatus);
+  }, [checkTokenStatus]);
 
   // Notify parent of connection status changes
   React.useEffect(() => {

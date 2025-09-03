@@ -9,7 +9,7 @@ import { LinkedInConnectionStatus } from './LinkedInConnectionStatus';
 import { SchedulingOptions } from './SchedulingOptions';
 import { ScheduleDialog } from './ScheduleDialog';
 import { usePostScheduling } from '@/hooks/usePostScheduling';
-import { useLinkedInConnection } from '@/hooks/useLinkedInConnection';
+
 import { useImageProcessor } from '@/hooks/useImageProcessor';
 
 interface NewPostPreviewProps {
@@ -40,7 +40,6 @@ export const NewPostPreview = ({
   userId
 }: NewPostPreviewProps) => {
   const [isLinkedInConnected, setIsLinkedInConnected] = React.useState(false);
-  const { tokenStatus, checkTokenStatus } = useLinkedInConnection();
   const {
     schedulingOption,
     isScheduleDialogOpen,
@@ -52,19 +51,6 @@ export const NewPostPreview = ({
   
   const { processedImageUrl, isProcessingImage, imageProcessingError } = useImageProcessor(imageUrl);
 
-  React.useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        await checkTokenStatus();
-        setIsLinkedInConnected(tokenStatus.isConnected && !tokenStatus.isExpired);
-      } catch (error) {
-        console.error('Error checking LinkedIn connection:', error);
-        setIsLinkedInConnected(false);
-      }
-    };
-
-    checkConnection();
-  }, [checkTokenStatus, tokenStatus]);
 
   const handleActionClick = async () => {
     if (!userId) return;
