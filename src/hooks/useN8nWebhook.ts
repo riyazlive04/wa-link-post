@@ -9,6 +9,7 @@ interface N8nWebhookResponse {
   summary?: string;
   tokensUsed?: number;
   imageUrl?: string;
+  imageId?: string;
   imageData?: any; // For JSON image data from n8n
 }
 
@@ -18,23 +19,42 @@ export const useN8nWebhook = () => {
   const { uploadBase64Image, isBase64Image } = useImageUpload();
 
   // Helper function to save image data to database
-  const saveImageDataToSupabase = useCallback(async (imageData: any, userId: string): Promise<string | null> => {
+  const saveImageDataToSupabase = useCallback(async (imageData: any, userId: string): Promise<{ imageUrl: string; imageId: string } | null> => {
     try {
-      if (!imageData || typeof imageData !== 'string') {
-        console.log('Invalid image data - expected base64 string');
-        return null;
-      }
-
-      // Validate it's base64 data
-      if (!imageData.startsWith('data:image/') && !isBase64String(imageData)) {
-        console.log('Image data is not valid base64');
-        return null;
-      }
-
-      // Determine mime type
+      let base64Data = '';
       let mimeType = 'image/png';
-      if (imageData.startsWith('data:image/')) {
-        mimeType = imageData.split(';')[0].split(':')[1];
+
+      // Handle different formats of image data
+      if (typeof imageData === 'string') {
+        if (imageData.startsWith('data:image/')) {
+          // Data URL format: data:image/png;base64,xxxx
+          const parts = imageData.split(',');
+          if (parts.length === 2) {
+            base64Data = parts[1];
+            mimeType = imageData.split(';')[0].split(':')[1];
+          } else {
+            console.log('Invalid data URL format');
+            return null;
+          }
+        } else if (isBase64String(imageData)) {
+          // Raw base64 string
+          base64Data = imageData;
+        } else {
+          console.log('Image data is not valid base64');
+          return null;
+        }
+      } else if (typeof imageData === 'object' && imageData.base64) {
+        // Object with base64 property
+        base64Data = imageData.base64;
+        mimeType = imageData.mimeType || mimeType;
+      } else {
+        console.log('Invalid image data format');
+        return null;
+      }
+
+      if (!base64Data) {
+        console.log('No base64 data found');
+        return null;
       }
 
       // Store image data in database
@@ -42,9 +62,9 @@ export const useN8nWebhook = () => {
         .from('images')
         .insert({
           user_id: userId,
-          image_data: imageData,
+          image_data: `data:${mimeType};base64,${base64Data}`,
           mime_type: mimeType,
-          file_name: `generated-image-${Date.now()}.${mimeType.split('/')[1]}`,
+          file_name: `ai-generated-${Date.now()}.${mimeType.split('/')[1]}`,
           source_type: 'ai_generated'
         })
         .select('id')
@@ -58,7 +78,7 @@ export const useN8nWebhook = () => {
       // Generate image URL using our edge function
       const imageUrl = `https://wmclgyqfocssfmdfkzne.supabase.co/functions/v1/get-image?id=${storedImage.id}`;
       console.log('Image stored successfully:', imageUrl);
-      return imageUrl;
+      return { imageUrl, imageId: storedImage.id };
 
     } catch (error: any) {
       console.error('Error saving image data to Supabase:', error);
@@ -129,6 +149,7 @@ export const useN8nWebhook = () => {
       }
 
       let imageUrl = '';
+      let imageId = '';
       
       // Handle different image formats from n8n
       if (shouldGenerateImage) {
@@ -137,29 +158,42 @@ export const useN8nWebhook = () => {
         
         // Priority 1: Check for base64 image data
         if (responseData.imageData && typeof responseData.imageData === 'string' && isBase64Image(responseData.imageData)) {
-          console.log('🚀 Found base64 image data, uploading to Supabase...');
-          imageUrl = await uploadBase64Image(responseData.imageData, userId, `ai-generated-${Date.now()}.jpg`) || '';
-          console.log('💾 Uploaded base64 image, got URL:', imageUrl);
+          console.log('🚀 Found base64 image data, saving to database...');
+          const result = await saveImageDataToSupabase(responseData.imageData, userId);
+          if (result) {
+            imageUrl = result.imageUrl;
+            imageId = result.imageId;
+            console.log('💾 Saved base64 image, got URL:', imageUrl, 'ID:', imageId);
+          }
         }
         // Priority 2: Check if imageUrl contains base64 data
         else if (responseData.imageUrl && typeof responseData.imageUrl === 'string' && isBase64Image(responseData.imageUrl)) {
-          console.log('🚀 Found base64 image in imageUrl field, uploading to Supabase...');
-          imageUrl = await uploadBase64Image(responseData.imageUrl, userId, `ai-generated-${Date.now()}.jpg`) || '';
-          console.log('💾 Uploaded base64 image from imageUrl, got URL:', imageUrl);
+          console.log('🚀 Found base64 image in imageUrl field, saving to database...');
+          const result = await saveImageDataToSupabase(responseData.imageUrl, userId);
+          if (result) {
+            imageUrl = result.imageUrl;
+            imageId = result.imageId;
+            console.log('💾 Saved base64 image from imageUrl, got URL:', imageUrl, 'ID:', imageId);
+          }
         }
-        // Priority 3: Check for direct URL
+        // Priority 3: Check for direct URL (external images)
         else if (responseData.imageUrl && typeof responseData.imageUrl === 'string' && responseData.imageUrl.startsWith('http')) {
-          console.log('✅ Using direct image URL from n8n:', responseData.imageUrl);
+          console.log('✅ Using direct image URL from n8n (external):', responseData.imageUrl);
           imageUrl = responseData.imageUrl;
+          // For external URLs, we don't have an imageId
         }
         // Priority 4: Handle metadata format (legacy)
         else if (responseData.imageUrl && typeof responseData.imageUrl === 'string') {
           try {
             const parsed = JSON.parse(responseData.imageUrl);
-            if (parsed && typeof parsed === 'object' && parsed.mimeType) {
+            if (parsed && typeof parsed === 'object') {
               console.log('🚨 ImageUrl contains metadata, treating as legacy format:', parsed);
-              imageUrl = await saveImageDataToSupabase(parsed, userId) || '';
-              console.log('💾 Saved metadata as image, got URL:', imageUrl);
+              const result = await saveImageDataToSupabase(parsed, userId);
+              if (result) {
+                imageUrl = result.imageUrl;
+                imageId = result.imageId;
+                console.log('💾 Saved metadata as image, got URL:', imageUrl, 'ID:', imageId);
+              }
             }
           } catch {
             console.log('⚠️ ImageUrl is not valid JSON or URL:', responseData.imageUrl);
@@ -168,8 +202,12 @@ export const useN8nWebhook = () => {
         // Priority 5: Handle object-based image data (legacy)
         else if (responseData.imageData && typeof responseData.imageData === 'object') {
           console.log('🔄 Processing image data as JSON object from n8n:', responseData.imageData);
-          imageUrl = await saveImageDataToSupabase(responseData.imageData, userId) || '';
-          console.log('💾 Saved image data object to Supabase, got URL:', imageUrl);
+          const result = await saveImageDataToSupabase(responseData.imageData, userId);
+          if (result) {
+            imageUrl = result.imageUrl;
+            imageId = result.imageId;
+            console.log('💾 Saved image data object to Supabase, got URL:', imageUrl, 'ID:', imageId);
+          }
         }
         else {
           console.log('⚠️ No valid image data found in n8n response');
@@ -181,6 +219,7 @@ export const useN8nWebhook = () => {
         summary: responseData.summary || '',
         tokensUsed: responseData.tokensUsed || 0,
         imageUrl: imageUrl,
+        imageId: imageId,
         imageData: responseData.imageData // Keep original image data for reference
       };
 

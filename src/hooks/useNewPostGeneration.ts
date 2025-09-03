@@ -16,6 +16,7 @@ export const useNewPostGeneration = () => {
   const [summary, setSummary] = useState<string>('');
   const [tokensUsed, setTokensUsed] = useState<number>(0);
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [imageId, setImageId] = useState<string>('');
   
   const { user } = useAuth();
   const { uploadAudio, isUploading } = useAudioUpload();
@@ -47,6 +48,7 @@ export const useNewPostGeneration = () => {
     setSummary('');
     setTokensUsed(0);
     setImageUrl('');
+    setImageId('');
 
     // Immediately upload to Supabase Storage
     if (user?.id) {
@@ -105,9 +107,11 @@ export const useNewPostGeneration = () => {
       if (imageData.imageUrl) {
         console.log('Using manual image:', imageData.imageUrl);
         setImageUrl(imageData.imageUrl);
+        setImageId(''); // Manual images don't have imageId in our system yet
       } else if (result.imageUrl) {
-        console.log('Using AI-generated image:', result.imageUrl);
+        console.log('Using AI-generated image:', result.imageUrl, 'imageId:', result.imageId);
         setImageUrl(result.imageUrl);
+        setImageId(result.imageId || '');
       }
     } else {
       console.error('Failed to generate post content');
@@ -150,6 +154,7 @@ export const useNewPostGeneration = () => {
     setSummary('');
     setTokensUsed(0);
     setImageUrl('');
+    setImageId('');
     resetImageState();
   }, [resetImageState]);
 
@@ -191,6 +196,7 @@ export const useNewPostGeneration = () => {
     summary,
     tokensUsed,
     imageUrl: getImageData().imageUrl || processedImageUrl || imageUrl, // Return manual image if available, otherwise processed AI-generated
+    imageId,
     imageSourceType: getImageData().imageSourceType,
     isUploading,
     isGenerating,
