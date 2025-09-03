@@ -19,6 +19,7 @@ const COMMON_TIMEZONES = [
   { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
   { value: 'Europe/London', label: 'London (GMT/BST)' },
   { value: 'Europe/Paris', label: 'Central European Time' },
+  { value: 'Asia/Kolkata', label: 'India Standard Time (IST)' },
   { value: 'Asia/Tokyo', label: 'Japan Standard Time' },
   { value: 'Asia/Shanghai', label: 'China Standard Time' },
   { value: 'Australia/Sydney', label: 'Australian Eastern Time' },

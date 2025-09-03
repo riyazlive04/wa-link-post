@@ -29,6 +29,8 @@
     /* UI Elements */
     --card: 0 0% 100%;
     --card-foreground: 210 11% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 15%;
     --border: 210 6% 90%;
     --input: 210 6% 90%;
     --ring: 201 100% 35%;
@@ -78,6 +80,8 @@
     --muted-foreground: 210 5% 65%;
     --card: 210 11% 10%;
     --card-foreground: 210 6% 93%;
+    --popover: 210 11% 10%;
+    --popover-foreground: 210 6% 93%;
     --border: 210 11% 18%;
     --input: 210 11% 18%;
   }
