@@ -193,8 +193,114 @@ export const useImageUpload = () => {
     }
   }, [toast]);
 
+  const uploadBase64Image = useCallback(async (base64Data: string, userId: string, filename?: string): Promise<string | null> => {
+    console.log('=== STARTING BASE64 IMAGE UPLOAD ===');
+    console.log('Base64 data length:', base64Data.length);
+    console.log('User ID:', userId);
+    console.log('Filename:', filename);
+
+    setIsUploading(true);
+
+    try {
+      // Extract MIME type and base64 data
+      let mimeType = 'image/jpeg'; // default
+      let base64Content = base64Data;
+
+      // Check if it's a data URL (data:image/jpeg;base64,...)
+      if (base64Data.startsWith('data:')) {
+        const [header, content] = base64Data.split(',');
+        if (header && content) {
+          const mimeMatch = header.match(/data:([^;]+)/);
+          if (mimeMatch) {
+            mimeType = mimeMatch[1];
+          }
+          base64Content = content;
+        }
+      }
+
+      console.log('Detected MIME type:', mimeType);
+      console.log('Base64 content length:', base64Content.length);
+
+      // Convert base64 to blob
+      const byteCharacters = atob(base64Content);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mimeType });
+
+      console.log('Created blob:', {
+        size: blob.size,
+        type: blob.type
+      });
+
+      // Create File object
+      const fileExt = mimeType.split('/')[1] || 'jpg';
+      const fileName = filename || `ai-generated-${Date.now()}.${fileExt}`;
+      const file = new File([blob], fileName, { type: mimeType });
+
+      console.log('Created file:', {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      });
+
+      // Use existing upload logic
+      const result = await uploadImage(file, userId);
+      console.log('Base64 upload result:', result);
+      
+      return result;
+
+    } catch (error: any) {
+      console.error('Base64 image upload error:', error);
+      
+      let errorMessage = 'Failed to process base64 image data.';
+      
+      if (error.message?.includes('Invalid character')) {
+        errorMessage = 'Invalid base64 image data provided.';
+      } else if (error.message?.includes('Failed to fetch')) {
+        errorMessage = 'Network error during image upload.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Base64 Upload Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [uploadImage, toast]);
+
+  const isBase64Image = useCallback((data: string): boolean => {
+    // Check for data URL format
+    if (data.startsWith('data:image/')) {
+      return true;
+    }
+    
+    // Check for raw base64 (common patterns)
+    if (data.length > 100 && /^[A-Za-z0-9+/]*={0,2}$/.test(data)) {
+      // Try to decode first few characters to verify it's valid base64
+      try {
+        atob(data.substring(0, 100));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    
+    return false;
+  }, []);
+
   return {
     uploadImage,
+    uploadBase64Image,
+    isBase64Image,
     isUploading
   };
 };

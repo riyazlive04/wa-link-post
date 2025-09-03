@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useImageUpload } from './useImageUpload';
 
 interface N8nWebhookResponse {
   postDraft: string;
@@ -14,6 +15,7 @@ interface N8nWebhookResponse {
 export const useN8nWebhook = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
+  const { uploadBase64Image, isBase64Image } = useImageUpload();
 
   // Helper function to save image JSON data to Supabase
   const saveImageDataToSupabase = useCallback(async (imageData: any, userId: string): Promise<string | null> => {
@@ -136,30 +138,43 @@ export const useN8nWebhook = () => {
         console.log('🖼️ Processing image data from n8n. Raw response imageUrl:', responseData.imageUrl);
         console.log('🖼️ Processing image data from n8n. Raw response imageData:', responseData.imageData);
         
-        // Check if imageUrl is metadata instead of actual URL
-        if (responseData.imageUrl && typeof responseData.imageUrl === 'string') {
+        // Priority 1: Check for base64 image data
+        if (responseData.imageData && typeof responseData.imageData === 'string' && isBase64Image(responseData.imageData)) {
+          console.log('🚀 Found base64 image data, uploading to Supabase...');
+          imageUrl = await uploadBase64Image(responseData.imageData, userId, `ai-generated-${Date.now()}.jpg`) || '';
+          console.log('💾 Uploaded base64 image, got URL:', imageUrl);
+        }
+        // Priority 2: Check if imageUrl contains base64 data
+        else if (responseData.imageUrl && typeof responseData.imageUrl === 'string' && isBase64Image(responseData.imageUrl)) {
+          console.log('🚀 Found base64 image in imageUrl field, uploading to Supabase...');
+          imageUrl = await uploadBase64Image(responseData.imageUrl, userId, `ai-generated-${Date.now()}.jpg`) || '';
+          console.log('💾 Uploaded base64 image from imageUrl, got URL:', imageUrl);
+        }
+        // Priority 3: Check for direct URL
+        else if (responseData.imageUrl && typeof responseData.imageUrl === 'string' && responseData.imageUrl.startsWith('http')) {
+          console.log('✅ Using direct image URL from n8n:', responseData.imageUrl);
+          imageUrl = responseData.imageUrl;
+        }
+        // Priority 4: Handle metadata format (legacy)
+        else if (responseData.imageUrl && typeof responseData.imageUrl === 'string') {
           try {
             const parsed = JSON.parse(responseData.imageUrl);
             if (parsed && typeof parsed === 'object' && parsed.mimeType) {
-              console.log('🚨 ImageUrl contains metadata, treating as imageData:', parsed);
+              console.log('🚨 ImageUrl contains metadata, treating as legacy format:', parsed);
               imageUrl = await saveImageDataToSupabase(parsed, userId) || '';
               console.log('💾 Saved metadata as image, got URL:', imageUrl);
-            } else {
-              // It's a regular URL string
-              console.log('✅ Using direct image URL from n8n:', responseData.imageUrl);
-              imageUrl = responseData.imageUrl;
             }
           } catch {
-            // Not JSON, treat as regular URL
-            console.log('✅ Using direct image URL (not JSON):', responseData.imageUrl);
-            imageUrl = responseData.imageUrl;
+            console.log('⚠️ ImageUrl is not valid JSON or URL:', responseData.imageUrl);
           }
-        } else if (responseData.imageData && typeof responseData.imageData === 'object') {
-          // New JSON format - save to Supabase
-          console.log('🔄 Processing image data as JSON from n8n:', responseData.imageData);
+        }
+        // Priority 5: Handle object-based image data (legacy)
+        else if (responseData.imageData && typeof responseData.imageData === 'object') {
+          console.log('🔄 Processing image data as JSON object from n8n:', responseData.imageData);
           imageUrl = await saveImageDataToSupabase(responseData.imageData, userId) || '';
-          console.log('💾 Saved image data to Supabase, got URL:', imageUrl);
-        } else {
+          console.log('💾 Saved image data object to Supabase, got URL:', imageUrl);
+        }
+        else {
           console.log('⚠️ No valid image data found in n8n response');
         }
       }
