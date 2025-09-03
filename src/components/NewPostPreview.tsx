@@ -1,16 +1,18 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Share2, FileText, Zap, Loader2, AlertTriangle, Image, Sparkles, Upload, Calendar, Clock, Send } from 'lucide-react';
+import { Share2, FileText, Zap, Loader2, AlertTriangle, Image, Sparkles, Upload, Calendar, Clock, Send, Coins } from 'lucide-react';
 import { LinkedInConnectionStatus } from './LinkedInConnectionStatus';
 import { SchedulingOptions } from './SchedulingOptions';
 import { ScheduleDialog } from './ScheduleDialog';
+import { CreditDisplay } from './CreditDisplay';
+import { PurchaseCreditsDialog } from './PurchaseCreditsDialog';
 import { usePostScheduling } from '@/hooks/usePostScheduling';
-
 import { useImageProcessor } from '@/hooks/useImageProcessor';
+import { useUserCredits } from '@/hooks/useUserCredits';
 
 interface NewPostPreviewProps {
   generatedContent: string;
@@ -40,6 +42,7 @@ export const NewPostPreview = ({
   userId
 }: NewPostPreviewProps) => {
   const [isLinkedInConnected, setIsLinkedInConnected] = React.useState(false);
+  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
   const {
     schedulingOption,
     isScheduleDialogOpen,
@@ -50,6 +53,7 @@ export const NewPostPreview = ({
   } = usePostScheduling();
   
   const { processedImageUrl, isProcessingImage, imageProcessingError } = useImageProcessor(imageUrl);
+  const { hasCredits, available_credits, isLoading: creditsLoading } = useUserCredits();
 
 
   const handleActionClick = async () => {
@@ -127,11 +131,17 @@ export const NewPostPreview = ({
         )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* LinkedIn Connection Status */}
-        <LinkedInConnectionStatus 
-          showCard={false}
-          onConnectionChange={setIsLinkedInConnected}
-        />
+        {/* Credits and LinkedIn Connection Status */}
+        <div className="space-y-3">
+          <CreditDisplay 
+            onPurchaseClick={() => setIsPurchaseDialogOpen(true)}
+            variant="compact"
+          />
+          <LinkedInConnectionStatus 
+            showCard={false}
+            onConnectionChange={setIsLinkedInConnected}
+          />
+        </div>
 
         {summary && (
           <div className="p-3 bg-muted rounded-lg">
@@ -213,12 +223,35 @@ export const NewPostPreview = ({
           />
         </div>
 
-        {!isLinkedInConnected && (
-          <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <AlertTriangle className="h-4 w-4 text-yellow-600" />
-            <p className="text-sm text-yellow-700">
-              Please connect your LinkedIn account to publish posts.
-            </p>
+        {(!isLinkedInConnected || !hasCredits) && (
+          <div className="space-y-2">
+            {!isLinkedInConnected && (
+              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                <p className="text-sm text-yellow-700">
+                  Please connect your LinkedIn account to publish posts.
+                </p>
+              </div>
+            )}
+            
+            {!hasCredits && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <Coins className="h-4 w-4 text-red-600" />
+                <div className="flex-1">
+                  <p className="text-sm text-red-700">
+                    You need at least 1 credit to publish posts. You currently have {available_credits} credits.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsPurchaseDialogOpen(true)}
+                  className="border-red-200 text-red-700 hover:bg-red-50"
+                >
+                  Buy Credits
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -239,7 +272,7 @@ export const NewPostPreview = ({
               isPublishing || 
               !generatedContent || 
               !userId ||
-              (schedulingOption === 'now' && (!onPublishPost || !isLinkedInConnected))
+              (schedulingOption === 'now' && (!onPublishPost || !isLinkedInConnected || !hasCredits))
             }
             className="w-full"
             size="lg"
@@ -254,7 +287,13 @@ export const NewPostPreview = ({
                 {schedulingOption === 'now' && <Send className="mr-2 h-4 w-4" />}
                 {schedulingOption === 'scheduled' && <Calendar className="mr-2 h-4 w-4" />}
                 {schedulingOption === 'draft' && <Clock className="mr-2 h-4 w-4" />}
-                {schedulingOption === 'now' && (isLinkedInConnected ? 'Publish to LinkedIn' : 'Connect LinkedIn to Publish')}
+                {schedulingOption === 'now' && (
+                  isLinkedInConnected && hasCredits 
+                    ? 'Publish to LinkedIn (1 credit)' 
+                    : !isLinkedInConnected 
+                      ? 'Connect LinkedIn to Publish'
+                      : 'Buy Credits to Publish'
+                )}
                 {schedulingOption === 'scheduled' && 'Schedule Post'}
                 {schedulingOption === 'draft' && 'Save as Draft'}
               </>
@@ -262,11 +301,16 @@ export const NewPostPreview = ({
           </Button>
         </div>
 
-        {/* Schedule Dialog */}
+        {/* Dialogs */}
         <ScheduleDialog
           open={isScheduleDialogOpen}
           onOpenChange={setIsScheduleDialogOpen}
           onSchedule={handleSchedule}
+        />
+        
+        <PurchaseCreditsDialog 
+          open={isPurchaseDialogOpen}
+          onOpenChange={setIsPurchaseDialogOpen}
         />
       </CardContent>
     </Card>

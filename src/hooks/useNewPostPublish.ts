@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserCredits } from '@/hooks/useUserCredits';
 
 // Global reference for triggering LinkedIn token status check from other hooks
 let triggerLinkedInCheck: (() => void) | null = null;
@@ -19,6 +20,7 @@ const triggerLinkedInTokenCheck = () => {
 export const useNewPostPublish = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const { toast } = useToast();
+  const { deductCredit, hasCredits, available_credits } = useUserCredits();
 
   const validateLinkedInConnection = async (userId: string) => {
     console.log('Validating LinkedIn connection for user:', userId);
@@ -71,12 +73,31 @@ export const useNewPostPublish = () => {
       return false;
     }
 
+    // Check credits before proceeding
+    if (!hasCredits) {
+      toast({
+        title: "Insufficient Credits",
+        description: `You need at least 1 credit to publish a post. You currently have ${available_credits} credits.`,
+        variant: "destructive"
+      });
+      return false;
+    }
+
     setIsPublishing(true);
     console.log('Starting publish process...');
 
     try {
       // Validate LinkedIn connection first
       await validateLinkedInConnection(userId);
+
+      // Deduct credit before publishing
+      console.log('Deducting credit before publishing...');
+      const creditDeducted = await deductCredit();
+      if (!creditDeducted) {
+        throw new Error('Failed to deduct credit. Please try again.');
+      }
+
+      console.log('Credit deducted successfully, proceeding with publish...');
 
       // Create a post record first with correct status and image data
       console.log('Creating post record...');
@@ -129,8 +150,8 @@ export const useNewPostPublish = () => {
       if (data?.success) {
         console.log('Publish successful!');
         const successMessage = imageUrl 
-          ? `Post with ${imageSourceType === 'manual_upload' ? 'uploaded' : 'AI-generated'} image published to LinkedIn successfully!`
-          : "Post published to LinkedIn successfully!";
+          ? `Post with ${imageSourceType === 'manual_upload' ? 'uploaded' : 'AI-generated'} image published to LinkedIn successfully! (1 credit used)`
+          : "Post published to LinkedIn successfully! (1 credit used)";
           
         toast({
           title: "Success",
@@ -166,6 +187,12 @@ export const useNewPostPublish = () => {
           description: errorMessage,
           variant: "destructive"
         });
+      } else if (errorMessage.includes('Failed to deduct credit')) {
+        toast({
+          title: "Credit Error",
+          description: errorMessage,
+          variant: "destructive"
+        });
       } else {
         toast({
           title: "Error",
@@ -179,10 +206,12 @@ export const useNewPostPublish = () => {
       setIsPublishing(false);
       console.log('Publish process completed');
     }
-  }, [toast]);
+  }, [toast, hasCredits, available_credits, deductCredit]);
 
   return {
     publishPost,
-    isPublishing
+    isPublishing,
+    hasCredits,
+    available_credits
   };
 };

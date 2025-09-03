@@ -4,11 +4,15 @@ import { DashboardOverview } from "@/components/DashboardOverview";
 import { NewPostGenerator } from "@/components/NewPostGenerator";
 import { RecentPosts } from "@/components/RecentPosts";
 import { Navbar } from "@/components/Navbar";
+import { CreditDisplay } from "@/components/CreditDisplay";
+import { PurchaseCreditsDialog } from "@/components/PurchaseCreditsDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
 
 const Index = () => {
   const { user, loading } = useAuth();
+  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
 
   if (loading) {
     return (
@@ -27,7 +31,14 @@ const Index = () => {
       <HeroSection />
       
       {user && (
-        <div className="container mx-auto px-4 py-12">
+        <div className="container mx-auto px-4 py-8 space-y-6">
+          {/* Credit Display */}
+          <CreditDisplay 
+            onPurchaseClick={() => setIsPurchaseDialogOpen(true)}
+            variant="compact"
+          />
+          
+          {/* Post Generator */}
           <NewPostGenerator />
         </div>
       )}
@@ -38,6 +49,12 @@ const Index = () => {
           <RecentPosts />
         </>
       )}
+      
+      {/* Purchase Credits Dialog */}
+      <PurchaseCreditsDialog 
+        open={isPurchaseDialogOpen}
+        onOpenChange={setIsPurchaseDialogOpen}
+      />
     </div>
   );
 };
