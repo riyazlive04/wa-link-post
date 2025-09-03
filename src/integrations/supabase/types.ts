@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      images: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          file_size: number | null
+          id: string
+          image_data: string
+          mime_type: string
+          source_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          image_data: string
+          mime_type?: string
+          source_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          image_data?: string
+          mime_type?: string
+          source_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       linkedin_tokens: {
         Row: {
           access_token: string
@@ -77,6 +113,7 @@ export type Database = {
           content: string | null
           created_at: string
           id: string
+          image_id: string | null
           image_source_type: string | null
           image_url: string | null
           linkedin_post_id: string | null
@@ -91,6 +128,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          image_id?: string | null
           image_source_type?: string | null
           image_url?: string | null
           linkedin_post_id?: string | null
@@ -105,6 +143,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          image_id?: string | null
           image_source_type?: string | null
           image_url?: string | null
           linkedin_post_id?: string | null
@@ -114,7 +153,15 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_posts_image_id"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "images"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

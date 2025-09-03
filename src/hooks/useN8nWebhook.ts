@@ -17,65 +17,62 @@ export const useN8nWebhook = () => {
   const { toast } = useToast();
   const { uploadBase64Image, isBase64Image } = useImageUpload();
 
-  // Helper function to save image JSON data to Supabase
+  // Helper function to save image data to database
   const saveImageDataToSupabase = useCallback(async (imageData: any, userId: string): Promise<string | null> => {
     try {
-      if (!imageData || typeof imageData !== 'object') {
-        console.log('No valid image data to save');
+      if (!imageData || typeof imageData !== 'string') {
+        console.log('Invalid image data - expected base64 string');
         return null;
       }
 
-      console.log('Saving image data to Supabase:', imageData);
-
-      // Generate unique filename
-      const timestamp = Date.now();
-      const filename = `image-data-${userId}-${timestamp}.json`;
-
-      // Save image data as JSON file to Supabase storage
-      const { data, error } = await supabase.storage
-        .from('post-images')
-        .upload(filename, JSON.stringify(imageData), {
-          contentType: 'application/json',
-          upsert: false
-        });
-
-      if (error) {
-        console.error('Error uploading image data:', error);
-        // Try fallback bucket if primary fails
-        const { data: fallbackData, error: fallbackError } = await supabase.storage
-          .from('recordings')
-          .upload(filename, JSON.stringify(imageData), {
-            contentType: 'application/json',
-            upsert: false
-          });
-
-        if (fallbackError) {
-          console.error('Error uploading to fallback bucket:', fallbackError);
-          return null;
-        }
-
-        // Get public URL from fallback bucket
-        const { data: publicUrlData } = supabase.storage
-          .from('recordings')
-          .getPublicUrl(filename);
-
-        console.log('Image data saved to fallback bucket:', publicUrlData.publicUrl);
-        return publicUrlData.publicUrl;
+      // Validate it's base64 data
+      if (!imageData.startsWith('data:image/') && !isBase64String(imageData)) {
+        console.log('Image data is not valid base64');
+        return null;
       }
 
-      // Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('post-images')
-        .getPublicUrl(filename);
+      // Determine mime type
+      let mimeType = 'image/png';
+      if (imageData.startsWith('data:image/')) {
+        mimeType = imageData.split(';')[0].split(':')[1];
+      }
 
-      console.log('Image data saved to Supabase:', publicUrlData.publicUrl);
-      return publicUrlData.publicUrl;
+      // Store image data in database
+      const { data: storedImage, error } = await supabase
+        .from('images')
+        .insert({
+          user_id: userId,
+          image_data: imageData,
+          mime_type: mimeType,
+          file_name: `generated-image-${Date.now()}.${mimeType.split('/')[1]}`,
+          source_type: 'ai_generated'
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Failed to store image in database:', error);
+        return null;
+      }
+
+      // Generate image URL using our edge function
+      const imageUrl = `https://wmclgyqfocssfmdfkzne.supabase.co/functions/v1/get-image?id=${storedImage.id}`;
+      console.log('Image stored successfully:', imageUrl);
+      return imageUrl;
 
     } catch (error: any) {
       console.error('Error saving image data to Supabase:', error);
       return null;
     }
   }, []);
+
+  const isBase64String = (str: string): boolean => {
+    try {
+      return btoa(atob(str)) === str;
+    } catch (err) {
+      return false;
+    }
+  };
 
   const callN8nWebhook = useCallback(async (
     userId: string, 

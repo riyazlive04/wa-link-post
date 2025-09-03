@@ -85,86 +85,41 @@ export const useImageUpload = () => {
     console.log('User ID:', userId);
 
     try {
-      // Generate unique filename with original extension
-      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
-      console.log('Generated filename:', fileName);
-
-      // Try to upload to post-images bucket first
-      let uploadBucket = 'post-images';
-      console.log(`Attempting upload to ${uploadBucket} bucket...`);
-      
-      let { error: uploadError } = await supabase.storage
-        .from(uploadBucket)
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      // If post-images bucket fails, try recordings bucket as fallback
-      if (uploadError) {
-        console.log(`Upload to ${uploadBucket} failed:`, uploadError);
-        console.log('Trying recordings bucket as fallback...');
-        
-        uploadBucket = 'recordings';
-        const fallbackResult = await supabase.storage
-          .from(uploadBucket)
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
-        uploadError = fallbackResult.error;
-        
-        if (fallbackResult.error) {
-          console.error('Fallback upload to recordings also failed:', fallbackResult.error);
-        } else {
-          console.log('Successfully uploaded to recordings bucket as fallback');
-        }
-      } else {
-        console.log(`Successfully uploaded to ${uploadBucket} bucket`);
+      // Convert file to base64
+      const base64Data = await fileToBase64(file);
+      if (!base64Data) {
+        throw new Error('Failed to process image file');
       }
 
-      if (uploadError) {
-        console.error('=== UPLOAD ERROR ===');
-        console.error('Final upload error:', uploadError);
-        console.error('Error details:', {
-          message: uploadError.message,
-          name: uploadError.name,
-          code: (uploadError as any).code,
-          status: (uploadError as any).status,
-          statusCode: (uploadError as any).statusCode
-        });
-        
-        // Provide more specific error messages
-        let errorMessage = uploadError.message;
-        if (uploadError.message.includes('not found')) {
-          errorMessage = 'Storage bucket not found. Please contact support.';
-        } else if (uploadError.message.includes('permission') || uploadError.message.includes('denied')) {
-          errorMessage = 'Permission denied. Please make sure you are logged in and try again.';
-        } else if (uploadError.message.includes('size') || uploadError.message.includes('large')) {
-          errorMessage = 'File too large. Please select a smaller image (max 10MB).';
-        } else if (uploadError.message.includes('type') || uploadError.message.includes('format')) {
-          errorMessage = 'Invalid file format. Please select a JPG, PNG, or WebP image.';
-        }
-        
-        throw new Error(errorMessage);
+      // Store image data in database
+      const { data: imageData, error } = await supabase
+        .from('images')
+        .insert({
+          user_id: userId,
+          image_data: base64Data,
+          mime_type: file.type,
+          file_name: file.name,
+          file_size: file.size,
+          source_type: 'manual_upload'
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Failed to store image:', error);
+        throw new Error('Failed to upload image. Please try again.');
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from(uploadBucket)
-        .getPublicUrl(fileName);
-
-      console.log('Image uploaded successfully to bucket:', uploadBucket);
-      console.log('Public URL:', publicUrl);
+      // Generate image URL using our edge function
+      const imageUrl = `https://wmclgyqfocssfmdfkzne.supabase.co/functions/v1/get-image?id=${imageData.id}`;
+      console.log('Image stored successfully:', imageUrl);
       
       toast({
         title: "Success",
         description: "Image uploaded successfully!",
       });
 
-      return publicUrl;
+      return imageUrl;
 
     } catch (error: any) {
       console.error('Image upload error:', error);
@@ -192,6 +147,21 @@ export const useImageUpload = () => {
       setIsUploading(false);
     }
   }, [toast]);
+
+  const fileToBase64 = (file: File): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result);
+      };
+      reader.onerror = () => {
+        console.error('Error reading file');
+        resolve(null);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
   const uploadBase64Image = useCallback(async (base64Data: string, userId: string, filename?: string): Promise<string | null> => {
     console.log('=== STARTING BASE64 IMAGE UPLOAD ===');
