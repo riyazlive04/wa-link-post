@@ -43,9 +43,10 @@ export const useNewPostPublish = () => {
     content: string, 
     userId: string, 
     imageUrl?: string, 
-    imageSourceType?: 'ai_generated' | 'manual_upload'
+    imageSourceType?: 'ai_generated' | 'manual_upload',
+    imageId?: string
   ) => {
-    console.log('publishPost called with:', { content: !!content, userId, imageUrl: !!imageUrl, imageSourceType });
+    console.log('publishPost called with:', { content: !!content, userId, imageUrl: !!imageUrl, imageSourceType, imageId });
     
     if (!content || !userId) {
       console.error('Missing required data:', { hasContent: !!content, hasUserId: !!userId });
@@ -71,6 +72,7 @@ export const useNewPostPublish = () => {
         .insert({
           content: content,
           image_url: imageUrl,
+          image_id: imageId || null,
           image_source_type: imageSourceType || 'ai_generated',
           status: 'generated',
           user_id: userId

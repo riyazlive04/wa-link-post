@@ -164,13 +164,14 @@ export const useNewPostGeneration = () => {
     try {
       const imageData = getImageData();
       const finalImageUrl = imageData.imageUrl || imageUrl;
+      const finalImageId = imageData.imageUrl ? '' : imageId; // Use imageId only for AI-generated images
       
-      await schedulePost(generatedContent, user.id, date, timezone, finalImageUrl, imageData.imageSourceType);
+      await schedulePost(generatedContent, user.id, date, timezone, finalImageUrl, imageData.imageSourceType, finalImageId);
       resetForm();
     } catch (error) {
       console.error('Error scheduling post:', error);
     }
-  }, [user?.id, generatedContent, imageUrl, schedulePost, getImageData, resetForm]);
+  }, [user?.id, generatedContent, imageUrl, imageId, schedulePost, getImageData, resetForm]);
 
   const handleSaveDraft = useCallback(async () => {
     if (!user?.id || !generatedContent) return;
@@ -178,13 +179,14 @@ export const useNewPostGeneration = () => {
     try {
       const imageData = getImageData();
       const finalImageUrl = imageData.imageUrl || imageUrl;
+      const finalImageId = imageData.imageUrl ? '' : imageId; // Use imageId only for AI-generated images
       
-      await savePostAsDraft(generatedContent, user.id, finalImageUrl, imageData.imageSourceType);
+      await savePostAsDraft(generatedContent, user.id, finalImageUrl, imageData.imageSourceType, finalImageId);
       resetForm();
     } catch (error) {
       console.error('Error saving draft:', error);
     }
-  }, [user?.id, generatedContent, imageUrl, savePostAsDraft, getImageData, resetForm]);
+  }, [user?.id, generatedContent, imageUrl, imageId, savePostAsDraft, getImageData, resetForm]);
 
   const canGenerate = !!(audioBlob && audioFileUrl && !isUploading && !isGenerating && !isUploadingImage);
 

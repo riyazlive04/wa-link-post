@@ -13,7 +13,8 @@ export const usePostScheduling = () => {
     content: string,
     userId: string,
     imageUrl?: string,
-    imageSourceType?: 'ai_generated' | 'manual_upload'
+    imageSourceType?: 'ai_generated' | 'manual_upload',
+    imageId?: string
   ) => {
     try {
       const { data, error } = await supabase
@@ -23,6 +24,7 @@ export const usePostScheduling = () => {
           content,
           status: 'draft',
           image_url: imageUrl,
+          image_id: imageId || null,
           image_source_type: imageSourceType,
         })
         .select()
@@ -53,7 +55,8 @@ export const usePostScheduling = () => {
     scheduledAt: Date,
     timezone: string,
     imageUrl?: string,
-    imageSourceType?: 'ai_generated' | 'manual_upload'
+    imageSourceType?: 'ai_generated' | 'manual_upload',
+    imageId?: string
   ) => {
     try {
       const { data, error } = await supabase
@@ -65,6 +68,7 @@ export const usePostScheduling = () => {
           scheduled_at: scheduledAt.toISOString(),
           timezone,
           image_url: imageUrl,
+          image_id: imageId || null,
           image_source_type: imageSourceType,
         })
         .select()

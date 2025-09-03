@@ -182,24 +182,51 @@ export const useN8nWebhook = () => {
           imageUrl = responseData.imageUrl;
           // For external URLs, we don't have an imageId
         }
-        // Priority 4: Handle metadata format (legacy)
+        // Priority 4: Handle object-based imageUrl (N8N metadata format)
+        else if (responseData.imageUrl && typeof responseData.imageUrl === 'object') {
+          console.log('🔍 Found object-based imageUrl (N8N metadata format):', responseData.imageUrl);
+          
+          // Check if this is the specific N8N metadata format
+          if (responseData.imageUrl.mimeType === 'application/json' && responseData.imageUrl.fileName) {
+            console.log('⚠️ N8N returned image metadata instead of actual image data. Need to fetch the actual image.');
+            console.log('📝 To fix this, update your N8N workflow to return the actual image data instead of metadata.');
+            console.log('💡 Recommendation: Modify N8N to read the JSON file content and return base64 data directly.');
+            
+            // For now, we cannot process this format - we need actual image data
+            console.log('❌ Cannot process metadata format - skipping image');
+          } else {
+            // Try to process as regular image data object
+            const result = await saveImageDataToSupabase(responseData.imageUrl, userId);
+            if (result) {
+              imageUrl = result.imageUrl;
+              imageId = result.imageId;
+              console.log('💾 Saved imageUrl object to Supabase, got URL:', imageUrl, 'ID:', imageId);
+            }
+          }
+        }
+        // Priority 5: Handle string-based metadata format (legacy)
         else if (responseData.imageUrl && typeof responseData.imageUrl === 'string') {
           try {
             const parsed = JSON.parse(responseData.imageUrl);
             if (parsed && typeof parsed === 'object') {
-              console.log('🚨 ImageUrl contains metadata, treating as legacy format:', parsed);
-              const result = await saveImageDataToSupabase(parsed, userId);
-              if (result) {
-                imageUrl = result.imageUrl;
-                imageId = result.imageId;
-                console.log('💾 Saved metadata as image, got URL:', imageUrl, 'ID:', imageId);
+              console.log('🔍 ImageUrl contains JSON metadata:', parsed);
+              
+              if (parsed.mimeType === 'application/json' && parsed.fileName) {
+                console.log('⚠️ N8N returned stringified image metadata. Cannot process - need actual image data.');
+              } else {
+                const result = await saveImageDataToSupabase(parsed, userId);
+                if (result) {
+                  imageUrl = result.imageUrl;
+                  imageId = result.imageId;
+                  console.log('💾 Saved parsed metadata as image, got URL:', imageUrl, 'ID:', imageId);
+                }
               }
             }
           } catch {
             console.log('⚠️ ImageUrl is not valid JSON or URL:', responseData.imageUrl);
           }
         }
-        // Priority 5: Handle object-based image data (legacy)
+        // Priority 6: Handle imageData object (legacy)
         else if (responseData.imageData && typeof responseData.imageData === 'object') {
           console.log('🔄 Processing image data as JSON object from n8n:', responseData.imageData);
           const result = await saveImageDataToSupabase(responseData.imageData, userId);
