@@ -29,6 +29,8 @@ export const NewPostGenerator = () => {
     setGeneratedContent,
     generatePost,
     handlePublishPost,
+    handleSchedulePost,
+    handleSaveDraft,
     handleToggleChange,
     handleImageSelect,
     handleClearImage
@@ -77,7 +79,10 @@ export const NewPostGenerator = () => {
           imageUrl={imageUrl}
           imageSourceType={imageSourceType}
           onContentChange={setGeneratedContent}
-          onPublishPost={handlePublishPost}
+        onPublishPost={handlePublishPost}
+        onSchedulePost={handleSchedulePost}
+        onSaveDraft={handleSaveDraft}
+        userId={user?.id}
           isPublishing={isPublishing}
         />
       )}

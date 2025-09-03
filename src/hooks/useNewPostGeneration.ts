@@ -5,6 +5,7 @@ import { useAudioUpload } from './useAudioUpload';
 import { useN8nWebhook } from './useN8nWebhook';
 import { useNewPostPublish } from './useNewPostPublish';
 import { useManualImageUpload } from './useManualImageUpload';
+import { usePostScheduling } from './usePostScheduling';
 
 export const useNewPostGeneration = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -19,6 +20,7 @@ export const useNewPostGeneration = () => {
   const { uploadAudio, isUploading } = useAudioUpload();
   const { callN8nWebhook, isGenerating } = useN8nWebhook();
   const { publishPost, isPublishing } = useNewPostPublish();
+  const { savePostAsDraft, schedulePost } = usePostScheduling();
   const {
     useManualImage,
     selectedImage,
@@ -133,17 +135,48 @@ export const useNewPostGeneration = () => {
     
     if (success) {
       console.log('Clearing form after successful publish');
-      // Clear the form after successful publish
-      setAudioBlob(null);
-      setAudioFileName('');
-      setAudioFileUrl('');
-      setGeneratedContent('');
-      setSummary('');
-      setTokensUsed(0);
-      setImageUrl('');
-      resetImageState();
+      resetForm();
     }
-  }, [user?.id, generatedContent, imageUrl, publishPost, getImageData, useManualImage, resetImageState]);
+  }, [user?.id, generatedContent, imageUrl, publishPost, getImageData, useManualImage]);
+
+  const resetForm = useCallback(() => {
+    setAudioBlob(null);
+    setAudioFileName('');
+    setAudioFileUrl('');
+    setGeneratedContent('');
+    setSummary('');
+    setTokensUsed(0);
+    setImageUrl('');
+    resetImageState();
+  }, [resetImageState]);
+
+  const handleSchedulePost = useCallback(async (date: Date, timezone: string) => {
+    if (!user?.id || !generatedContent) return;
+
+    try {
+      const imageData = getImageData();
+      const finalImageUrl = imageData.imageUrl || imageUrl;
+      
+      await schedulePost(generatedContent, user.id, date, timezone, finalImageUrl, imageData.imageSourceType);
+      resetForm();
+    } catch (error) {
+      console.error('Error scheduling post:', error);
+    }
+  }, [user?.id, generatedContent, imageUrl, schedulePost, getImageData, resetForm]);
+
+  const handleSaveDraft = useCallback(async () => {
+    if (!user?.id || !generatedContent) return;
+
+    try {
+      const imageData = getImageData();
+      const finalImageUrl = imageData.imageUrl || imageUrl;
+      
+      await savePostAsDraft(generatedContent, user.id, finalImageUrl, imageData.imageSourceType);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving draft:', error);
+    }
+  }, [user?.id, generatedContent, imageUrl, savePostAsDraft, getImageData, resetForm]);
 
   const canGenerate = !!(audioBlob && audioFileUrl && !isUploading && !isGenerating && !isUploadingImage);
 
@@ -170,6 +203,8 @@ export const useNewPostGeneration = () => {
     setGeneratedContent,
     generatePost,
     handlePublishPost,
+    handleSchedulePost,
+    handleSaveDraft,
     handleToggleChange,
     handleImageSelect: handleImageSelectWithUserId,
     handleClearImage

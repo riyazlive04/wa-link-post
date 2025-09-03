@@ -4,8 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Share2, FileText, Zap, Loader2, AlertTriangle, Image, Sparkles, Upload } from 'lucide-react';
+import { Share2, FileText, Zap, Loader2, AlertTriangle, Image, Sparkles, Upload, Calendar, Clock, Send } from 'lucide-react';
 import { LinkedInConnectionStatus } from './LinkedInConnectionStatus';
+import { SchedulingOptions } from './SchedulingOptions';
+import { ScheduleDialog } from './ScheduleDialog';
+import { usePostScheduling } from '@/hooks/usePostScheduling';
+import { useLinkedInConnection } from '@/hooks/useLinkedInConnection';
 
 interface NewPostPreviewProps {
   generatedContent: string;
@@ -15,7 +19,10 @@ interface NewPostPreviewProps {
   imageSourceType?: 'ai_generated' | 'manual_upload';
   onContentChange: (content: string) => void;
   onPublishPost?: () => void;
+  onSchedulePost?: (date: Date, timezone: string) => void;
+  onSaveDraft?: () => void;
   isPublishing?: boolean;
+  userId?: string;
 }
 
 export const NewPostPreview = ({
@@ -26,25 +33,75 @@ export const NewPostPreview = ({
   imageSourceType = 'ai_generated',
   onContentChange,
   onPublishPost,
-  isPublishing = false
+  onSchedulePost,
+  onSaveDraft,
+  isPublishing = false,
+  userId
 }: NewPostPreviewProps) => {
   const [isLinkedInConnected, setIsLinkedInConnected] = React.useState(false);
+  const { tokenStatus, checkTokenStatus } = useLinkedInConnection();
+  const {
+    schedulingOption,
+    isScheduleDialogOpen,
+    setIsScheduleDialogOpen,
+    handleSchedulingOptionChange,
+    savePostAsDraft,
+    schedulePost,
+  } = usePostScheduling();
 
-  const handlePublishClick = () => {
-    console.log('Publish button clicked');
-    console.log('onPublishPost available:', !!onPublishPost);
-    console.log('generatedContent available:', !!generatedContent);
-    console.log('LinkedIn connected:', isLinkedInConnected);
-    
-    if (onPublishPost) {
-      console.log('Calling onPublishPost');
-      onPublishPost();
-    } else {
-      console.error('No onPublishPost function provided!');
+  React.useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        await checkTokenStatus();
+        setIsLinkedInConnected(tokenStatus.isConnected && !tokenStatus.isExpired);
+      } catch (error) {
+        console.error('Error checking LinkedIn connection:', error);
+        setIsLinkedInConnected(false);
+      }
+    };
+
+    checkConnection();
+  }, [checkTokenStatus, tokenStatus]);
+
+  const handleActionClick = async () => {
+    if (!userId) return;
+
+    try {
+      switch (schedulingOption) {
+        case 'now':
+          if (onPublishPost) {
+            onPublishPost();
+          }
+          break;
+        case 'draft':
+          if (onSaveDraft) {
+            onSaveDraft();
+          } else {
+            await savePostAsDraft(generatedContent, userId, imageUrl, imageSourceType);
+          }
+          break;
+        case 'scheduled':
+          // Dialog will handle the scheduling
+          break;
+      }
+    } catch (error) {
+      console.error('Error performing action:', error);
     }
   };
 
-  const canPublish = generatedContent && onPublishPost && isLinkedInConnected && !isPublishing;
+  const handleSchedule = async (date: Date, timezone: string) => {
+    if (!userId) return;
+    
+    try {
+      if (onSchedulePost) {
+        onSchedulePost(date, timezone);
+      } else {
+        await schedulePost(generatedContent, userId, date, timezone, imageUrl, imageSourceType);
+      }
+    } catch (error) {
+      console.error('Error scheduling post:', error);
+    }
+  };
 
   return (
     <Card>
@@ -154,24 +211,52 @@ export const NewPostPreview = ({
           </div>
         )}
 
-        <Button 
-          className="w-full" 
-          size="lg"
-          onClick={handlePublishClick}
-          disabled={!canPublish}
-        >
-          {isPublishing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Publishing to LinkedIn...
-            </>
-          ) : (
-            <>
-              <Share2 className="mr-2 h-4 w-4" />
-              {!isLinkedInConnected ? 'Connect LinkedIn to Publish' : 'Publish to LinkedIn'}
-            </>
-          )}
-        </Button>
+        {/* Scheduling Options */}
+        <div className="space-y-4">
+          <div>
+            <h4 className="text-sm font-medium mb-3">Publishing Options</h4>
+            <SchedulingOptions
+              value={schedulingOption}
+              onChange={handleSchedulingOptionChange}
+            />
+          </div>
+
+          {/* Action Button */}
+          <Button
+            onClick={handleActionClick}
+            disabled={
+              isPublishing || 
+              !generatedContent || 
+              !userId ||
+              (schedulingOption === 'now' && (!onPublishPost || !isLinkedInConnected))
+            }
+            className="w-full"
+            size="lg"
+          >
+            {isPublishing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {schedulingOption === 'now' ? 'Publishing to LinkedIn...' : 'Processing...'}
+              </>
+            ) : (
+              <>
+                {schedulingOption === 'now' && <Send className="mr-2 h-4 w-4" />}
+                {schedulingOption === 'scheduled' && <Calendar className="mr-2 h-4 w-4" />}
+                {schedulingOption === 'draft' && <Clock className="mr-2 h-4 w-4" />}
+                {schedulingOption === 'now' && (isLinkedInConnected ? 'Publish to LinkedIn' : 'Connect LinkedIn to Publish')}
+                {schedulingOption === 'scheduled' && 'Schedule Post'}
+                {schedulingOption === 'draft' && 'Save as Draft'}
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Schedule Dialog */}
+        <ScheduleDialog
+          open={isScheduleDialogOpen}
+          onOpenChange={setIsScheduleDialogOpen}
+          onSchedule={handleSchedule}
+        />
       </CardContent>
     </Card>
   );

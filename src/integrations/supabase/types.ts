@@ -80,7 +80,9 @@ export type Database = {
           image_source_type: string | null
           image_url: string | null
           linkedin_post_id: string | null
+          scheduled_at: string | null
           status: string
+          timezone: string | null
           updated_at: string
           user_id: string | null
         }
@@ -92,7 +94,9 @@ export type Database = {
           image_source_type?: string | null
           image_url?: string | null
           linkedin_post_id?: string | null
+          scheduled_at?: string | null
           status?: string
+          timezone?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -104,7 +108,9 @@ export type Database = {
           image_source_type?: string | null
           image_url?: string | null
           linkedin_post_id?: string | null
+          scheduled_at?: string | null
           status?: string
+          timezone?: string | null
           updated_at?: string
           user_id?: string | null
         }
