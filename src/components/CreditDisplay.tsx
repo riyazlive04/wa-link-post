@@ -16,10 +16,12 @@ export const CreditDisplay = ({
   showPurchaseButton = true,
   variant = 'default' 
 }: CreditDisplayProps) => {
-  const { available_credits, isLoading } = useUserCredits();
+  const { available_credits, is_admin, isLoading } = useUserCredits();
 
   const getCreditStatus = () => {
-    if (available_credits <= 0) {
+    if (is_admin) {
+      return { color: 'default' as const, message: 'Admin • Unlimited' };
+    } else if (available_credits <= 0) {
       return { color: 'destructive' as const, message: 'No credits' };
     } else if (available_credits <= 2) {
       return { color: 'secondary' as const, message: 'Low credits' };
@@ -38,10 +40,12 @@ export const CreditDisplay = ({
           {isLoading ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            <span className="text-sm font-medium">{available_credits}</span>
+            <span className="text-sm font-medium">
+              {is_admin ? '∞' : available_credits}
+            </span>
           )}
         </div>
-        {showPurchaseButton && available_credits <= 2 && onPurchaseClick && (
+        {showPurchaseButton && !is_admin && available_credits <= 2 && onPurchaseClick && (
           <Button
             variant="outline"
             size="sm"
@@ -66,7 +70,9 @@ export const CreditDisplay = ({
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <span className="font-semibold">{available_credits}</span>
+                <span className="font-semibold">
+                  {is_admin ? '∞' : available_credits}
+                </span>
               )}
               <Badge variant={status.color} className="text-xs">
                 {status.message}
@@ -76,7 +82,7 @@ export const CreditDisplay = ({
           </div>
         </div>
         
-        {showPurchaseButton && onPurchaseClick && (
+        {showPurchaseButton && !is_admin && onPurchaseClick && (
           <Button
             variant={available_credits <= 2 ? "default" : "outline"}
             size="sm"
@@ -105,7 +111,9 @@ export const CreditDisplay = ({
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  <span className="text-2xl font-bold">{available_credits}</span>
+                  <span className="text-2xl font-bold">
+                    {is_admin ? '∞' : available_credits}
+                  </span>
                 )}
                 <Badge variant={status.color}>
                   {status.message}
@@ -118,7 +126,7 @@ export const CreditDisplay = ({
             </div>
           </div>
           
-          {showPurchaseButton && onPurchaseClick && (
+          {showPurchaseButton && !is_admin && onPurchaseClick && (
             <Button
               variant={available_credits <= 2 ? "default" : "outline"}
               onClick={onPurchaseClick}

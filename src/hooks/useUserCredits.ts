@@ -20,6 +20,7 @@ interface PaymentHistory {
 
 interface UserCreditsData {
   available_credits: number;
+  is_admin: boolean;
   credit_breakdown: CreditBreakdown[];
   recent_payments: PaymentHistory[];
 }
@@ -27,6 +28,7 @@ interface UserCreditsData {
 export const useUserCredits = () => {
   const [creditsData, setCreditsData] = useState<UserCreditsData>({
     available_credits: 0,
+    is_admin: false,
     credit_breakdown: [],
     recent_payments: []
   });
@@ -40,6 +42,7 @@ export const useUserCredits = () => {
     if (!user?.id) {
       setCreditsData({
         available_credits: 0,
+        is_admin: false,
         credit_breakdown: [],
         recent_payments: []
       });
@@ -58,6 +61,7 @@ export const useUserCredits = () => {
       if (data?.success) {
         setCreditsData({
           available_credits: data.available_credits || 0,
+          is_admin: data.is_admin || false,
           credit_breakdown: data.credit_breakdown || [],
           recent_payments: data.recent_payments || []
         });
@@ -84,6 +88,11 @@ export const useUserCredits = () => {
         variant: "destructive"
       });
       return false;
+    }
+
+    // Admin users have unlimited credits
+    if (creditsData.is_admin) {
+      return true;
     }
 
     if (creditsData.available_credits <= 0) {
@@ -189,6 +198,6 @@ export const useUserCredits = () => {
     isDeducting,
     fetchCredits,
     deductCredit,
-    hasCredits: creditsData.available_credits > 0
+    hasCredits: creditsData.is_admin || creditsData.available_credits > 0
   };
 };

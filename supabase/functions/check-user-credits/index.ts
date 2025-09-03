@@ -29,6 +29,16 @@ serve(async (req) => {
       throw new Error("User not authenticated");
     }
 
+    console.log(`Checking credits for user: ${user.id}`);
+
+    // Check if user is admin
+    const { data: isAdmin, error: roleError } = await supabaseClient
+      .rpc('has_role', { _user_id: user.id, _role: 'admin' });
+
+    if (roleError) {
+      console.error('Error checking user role:', roleError);
+    }
+
     // Get user's available credits using the database function
     const { data: creditsData, error: creditsError } = await supabaseClient.rpc(
       'get_available_credits', 
@@ -65,12 +75,13 @@ serve(async (req) => {
       // Don't throw error here, just log it
     }
 
-    console.log(`User ${user.id} has ${creditsData || 0} available credits`);
+    console.log(`User ${user.id} has ${creditsData || 0} available credits${isAdmin ? ' (admin - unlimited)' : ''}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         available_credits: creditsData || 0,
+        is_admin: isAdmin || false,
         credit_breakdown: creditBreakdown || [],
         recent_payments: paymentHistory || [],
         user_id: user.id
@@ -84,7 +95,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: false, 
         error: error.message || 'Failed to check user credits',
-        available_credits: 0
+        available_credits: 0,
+        is_admin: false
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
