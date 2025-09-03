@@ -57,32 +57,36 @@ export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Coins className="h-5 w-5 text-primary" />
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <div className="p-2 bg-primary/10 rounded-full">
+              <Coins className="h-5 w-5 text-primary" />
+            </div>
             Purchase Credits
           </DialogTitle>
-          <DialogDescription>
-            Choose a plan to get more credits for publishing posts. Credits never expire and roll over month to month.
+          <DialogDescription className="text-muted-foreground">
+            Get more credits to continue publishing your LinkedIn posts. Credits never expire!
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Current Credits */}
-          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Coins className="h-4 w-4 text-primary" />
-              <span className="text-sm">Current balance:</span>
+          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/5 via-accent/5 to-secondary/10 rounded-xl border">
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 bg-primary/10 rounded-full">
+                <Coins className="h-4 w-4 text-primary" />
+              </div>
+              <span className="text-sm font-medium">Current balance</span>
             </div>
-            <Badge variant="outline" className="font-medium">
+            <Badge variant="secondary" className="px-3 py-1 font-semibold">
               {available_credits} credits
             </Badge>
           </div>
 
           {/* Plan Selection */}
           <div className="space-y-4">
-            <h3 className="font-medium">Select Payment Plan</h3>
+            <h3 className="font-semibold text-foreground">Choose Your Plan</h3>
             <div className="grid gap-3">
               {Object.entries(PAYMENT_PLANS).map(([key, planData]) => {
                 const PlanIcon = planData.icon;
@@ -91,43 +95,49 @@ export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDia
                 return (
                   <Card 
                     key={key}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
+                    className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] ${
                       isSelected 
-                        ? 'ring-2 ring-primary border-primary' 
-                        : 'hover:border-primary/50'
+                        ? 'ring-2 ring-primary border-primary bg-primary/5 shadow-lg' 
+                        : 'hover:border-primary/30'
                     }`}
                     onClick={() => setSelectedPlan(key as 'INR' | 'USD')}
                   >
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <PlanIcon className="h-5 w-5 text-primary" />
+                          <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                            <PlanIcon className="h-5 w-5" />
+                          </div>
                           <div>
-                            <CardTitle className="text-lg">
+                            <CardTitle className="text-xl font-bold">
                               {planData.symbol}{planData.amount}
                             </CardTitle>
-                            <CardDescription>
-                              {planData.region} • {planData.credits} credits
+                            <CardDescription className="text-sm">
+                              {planData.region}
                             </CardDescription>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {planData.popular && (
-                            <Badge className="bg-primary">
+                            <Badge className="bg-gradient-to-r from-primary to-accent text-primary-foreground border-0">
                               <Users className="h-3 w-3 mr-1" />
                               Popular
                             </Badge>
                           )}
                           {isSelected && (
-                            <CheckCircle className="h-5 w-5 text-primary" />
+                            <div className="p-1 bg-primary rounded-full">
+                              <CheckCircle className="h-4 w-4 text-primary-foreground" />
+                            </div>
                           )}
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Per credit cost:</span>
-                        <span>{planData.symbol}{(planData.amount / planData.credits).toFixed(2)}</span>
+                    <CardContent className="pt-0 space-y-2">
+                      <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                        <span className="text-sm font-medium">{planData.credits} credits</span>
+                        <span className="text-xs text-muted-foreground">
+                          {planData.symbol}{(planData.amount / planData.credits).toFixed(2)} per credit
+                        </span>
                       </div>
                     </CardContent>
                   </Card>
@@ -137,25 +147,27 @@ export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDia
           </div>
 
           {/* Purchase Summary */}
-          <div className="p-4 bg-muted/30 rounded-lg space-y-3">
-            <h4 className="font-medium flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
+          <div className="p-4 bg-gradient-to-br from-muted/30 via-secondary/20 to-primary/5 rounded-xl border space-y-3">
+            <h4 className="font-semibold flex items-center gap-2 text-foreground">
+              <div className="p-1 bg-primary/10 rounded">
+                <CreditCard className="h-4 w-4 text-primary" />
+              </div>
               Purchase Summary
             </h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Credits to purchase:</span>
-                <span className="font-medium">{plan.credits} credits</span>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Credits:</span>
+                <span className="font-semibold">{plan.credits} credits</span>
               </div>
-              <div className="flex justify-between">
-                <span>Amount:</span>
-                <span className="font-medium">{plan.symbol}{plan.amount}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Amount:</span>
+                <span className="font-semibold text-lg">{plan.symbol}{plan.amount}</span>
               </div>
-              <Separator />
-              <div className="flex justify-between">
-                <span>After purchase:</span>
-                <span className="font-medium text-primary">
-                  {available_credits + plan.credits} total credits
+              <Separator className="my-2" />
+              <div className="flex justify-between items-center p-2 bg-primary/10 rounded-lg">
+                <span className="font-medium">New total:</span>
+                <span className="font-bold text-primary text-lg">
+                  {available_credits + plan.credits} credits
                 </span>
               </div>
             </div>
@@ -184,37 +196,41 @@ export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDia
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-2">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isProcessing}
+              className="px-6"
             >
               Cancel
             </Button>
             <Button
               onClick={handlePurchase}
               disabled={isProcessing}
-              className="flex-1"
+              className="flex-1 bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary text-primary-foreground font-semibold py-2.5 shadow-lg hover:shadow-xl transition-all duration-200"
             >
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  Processing Payment...
                 </>
               ) : (
                 <>
                   <CreditCard className="mr-2 h-4 w-4" />
-                  Pay {plan.symbol}{plan.amount}
+                  Secure Payment {plan.symbol}{plan.amount}
                 </>
               )}
             </Button>
           </div>
 
           {/* Security Note */}
-          <p className="text-xs text-muted-foreground text-center">
-            Payments are processed securely through Razorpay. Your payment information is encrypted and secure.
-          </p>
+          <div className="text-center p-3 bg-muted/30 rounded-lg">
+            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+              <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Secure payments powered by Razorpay • SSL encrypted
+            </p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

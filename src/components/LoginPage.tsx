@@ -39,7 +39,7 @@ export const LoginPage = () => {
             Welcome to LinkedIn Post Agent
           </CardTitle>
           <CardDescription>
-            Sign in with your LinkedIn account to start generating posts
+            Sign in with your LinkedIn account to start generating posts. Get 5 free credits to get started!
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -51,7 +51,7 @@ export const LoginPage = () => {
             disabled={loading}
           >
             <Linkedin className="mr-2 h-5 w-5" />
-            {loading ? 'Connecting...' : 'Continue with LinkedIn'}
+            {loading ? 'Connecting...' : 'Continue with LinkedIn • Get 5 Free Credits'}
           </Button>
 
           {/* Developer Help */}
