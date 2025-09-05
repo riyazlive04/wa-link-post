@@ -8,6 +8,11 @@ const corsHeaders = {
 
 // Payment plans configuration
 const PAYMENT_PLANS = {
+  'free-tier': {
+    amount: 00000, // ₹000 in paise
+    currency: 'INR',
+    credits: 5
+  },
   'solo-in': {
     amount: 49900, // ₹499 in paise
     currency: 'INR',
