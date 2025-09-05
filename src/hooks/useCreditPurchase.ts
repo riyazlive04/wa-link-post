@@ -68,6 +68,7 @@ export const useCreditPurchase = () => {
 
       // Create payment order
       console.log('Creating payment order for plan:', planId);
+      console.log('Request body:', { planId });
       const { data: orderData, error: orderError } = await supabase.functions.invoke(
         'create-payment-order',
         { body: { planId } }

@@ -129,9 +129,11 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
 
   const handlePurchase = async (plan: PricingPlan) => {
     try {
+      console.log('Purchasing plan:', plan.id);
       await purchaseCredits(plan.id);
       onOpenChange(false);
     } catch (error) {
+      console.error('Purchase error:', error);
       toast({
         title: "Purchase Failed",
         description: "Unable to process payment. Please try again.",
