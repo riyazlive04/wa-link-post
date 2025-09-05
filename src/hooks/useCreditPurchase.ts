@@ -60,22 +60,34 @@ export const useCreditPurchase = () => {
     setIsProcessing(true);
 
     try {
+      console.log('Starting credit purchase process for planId:', planId);
+      
       // Load Razorpay if not already loaded
       const razorpayLoaded = await loadRazorpay();
       if (!razorpayLoaded) {
         throw new Error('Failed to load payment gateway');
       }
+      console.log('Razorpay loaded successfully');
 
       // Create payment order
       console.log('Creating payment order for plan:', planId);
       console.log('Request body:', { planId });
+      console.log('User:', user);
+      
       const { data: orderData, error: orderError } = await supabase.functions.invoke(
         'create-payment-order',
         { body: { planId } }
       );
 
-      if (orderError || !orderData?.success) {
-        console.error('Order creation error:', orderError);
+      console.log('Edge function response:', { orderData, orderError });
+
+      if (orderError) {
+        console.error('Edge function error:', orderError);
+        throw new Error(`Edge function error: ${orderError.message}`);
+      }
+
+      if (!orderData?.success) {
+        console.error('Order creation failed:', orderData);
         throw new Error(orderData?.error || 'Failed to create payment order');
       }
 
@@ -167,7 +179,12 @@ export const useCreditPurchase = () => {
       return true;
 
     } catch (error: any) {
-      console.error('Purchase credits error:', error);
+      console.error('Purchase credits error details:', {
+        error,
+        message: error.message,
+        stack: error.stack,
+        planId
+      });
       toast({
         title: "Purchase Failed",
         description: error.message || "Failed to initiate purchase. Please try again.",
