@@ -190,7 +190,7 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
                   <div className="text-center mt-6">
                     <div className="flex items-baseline justify-center">
                       <span className="text-4xl font-bold text-foreground">
-                        ${plan.price}
+                        ₹{plan.price}
                       </span>
                       <span className="text-muted-foreground ml-2">/month</span>
                     </div>
@@ -222,7 +222,7 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
 
         <div className="text-center mt-8 pt-6 border-t border-border">
           <p className="text-xs text-muted-foreground">
-            {isIndia ? 'Pricing in USD for Indian users' : 'Global pricing in USD'}
+            All pricing displayed in Indian Rupees (INR) • Secure payments by Razorpay
           </p>
         </div>
       </DialogContent>

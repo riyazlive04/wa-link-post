@@ -20,33 +20,36 @@ interface PurchaseCreditsDialogProps {
 }
 
 const PAYMENT_PLANS = {
-  INR: {
+  'solo-in': {
     currency: 'INR',
     symbol: '₹',
-    amount: 499,
+    amount: 4.99,
     credits: 30,
     popular: true,
-    region: 'India',
-    icon: IndianRupee
+    region: 'Solo Plan',
+    icon: IndianRupee,
+    planId: 'solo-in'
   },
-  USD: {
-    currency: 'USD', 
-    symbol: '$',
-    amount: 10.99,
-    credits: 30,
+  'startup-in': {
+    currency: 'INR',
+    symbol: '₹',
+    amount: 9.99,
+    credits: 60,
     popular: false,
-    region: 'International',
-    icon: DollarSign
+    region: 'Startup Plan',
+    icon: IndianRupee,
+    planId: 'startup-in'
   }
 };
 
 export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDialogProps) => {
-  const [selectedPlan, setSelectedPlan] = useState<'INR' | 'USD'>('INR');
+  const [selectedPlan, setSelectedPlan] = useState<'solo-in' | 'startup-in'>('solo-in');
   const { purchaseCredits, isProcessing } = useCreditPurchase();
   const { available_credits, recent_payments } = useUserCredits();
 
   const handlePurchase = async () => {
-    const success = await purchaseCredits(selectedPlan);
+    const plan = PAYMENT_PLANS[selectedPlan];
+    const success = await purchaseCredits(plan.planId);
     if (success) {
       // Keep dialog open to show success state, it will close automatically
       // or user can close it manually after seeing the success message
@@ -100,7 +103,7 @@ export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDia
                         ? 'ring-2 ring-primary border-primary bg-primary/5 shadow-lg' 
                         : 'hover:border-primary/30'
                     }`}
-                    onClick={() => setSelectedPlan(key as 'INR' | 'USD')}
+                    onClick={() => setSelectedPlan(key as 'solo-in' | 'startup-in')}
                   >
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
@@ -181,7 +184,7 @@ export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDia
                 {recent_payments.slice(0, 3).map((payment, index) => (
                   <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
                     <span>
-                      {payment.credits_purchased} credits • {payment.currency} {payment.amount / 100}
+                      {payment.credits_purchased} credits • ₹{(payment.amount / 100).toFixed(2)}
                     </span>
                     <Badge 
                       variant={payment.status === 'success' ? 'default' : 'secondary'}
