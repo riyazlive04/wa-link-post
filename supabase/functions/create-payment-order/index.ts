@@ -164,10 +164,14 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Create payment order error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Failed to create payment order' 
+        error: error.message || 'Failed to create payment order',
+        details: error.stack || 'No stack trace available'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
