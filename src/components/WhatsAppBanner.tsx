@@ -20,6 +20,7 @@ export const WhatsAppBanner = () => {
             variant="outline" 
             size="sm"
             className="bg-white/10 border-white/20 text-white hover:bg-white/20 flex items-center gap-2 whitespace-nowrap"
+            onClick={() => window.open('https://calendly.com/sirahdigital-support/30min', '_blank')}
           >
             <Zap className="h-3 w-3" />
             Book your slot now
