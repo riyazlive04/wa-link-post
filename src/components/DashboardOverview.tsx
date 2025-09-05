@@ -1,38 +1,41 @@
 
 import { DashboardCard } from "./DashboardCard";
-import { FileText, MessageSquare, TrendingUp, Calendar, Sparkles } from "lucide-react";
+import { Mic, FileText, Clock, Send, Sparkles } from "lucide-react";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 
 export const DashboardOverview = () => {
-  const stats = [
+  const { data: stats, isLoading } = useDashboardStats();
+
+  const dashboardStats = [
     {
-      title: "Total Posts",
-      description: "Posts created this month",
-      icon: FileText,
-      value: "24",
-      trend: { value: "+12%", isPositive: true },
+      title: "Voice Messages",
+      description: "Audio messages processed",
+      icon: Mic,
+      value: isLoading ? "..." : stats?.voiceMessages.toString() || "0",
+      trend: { value: "+2", isPositive: true },
       gradient: "from-primary/10 to-accent/10"
     },
     {
-      title: "WhatsApp Messages",
-      description: "Messages processed today",
-      icon: MessageSquare,
-      value: "8",
+      title: "Posts Generated",
+      description: "Total posts created",
+      icon: FileText,
+      value: isLoading ? "..." : stats?.postsGenerated.toString() || "0",
       trend: { value: "+5", isPositive: true },
       gradient: "from-accent/10 to-success/10"
     },
     {
-      title: "Engagement Rate",
-      description: "Average post engagement",
-      icon: TrendingUp,
-      value: "4.2%",
-      trend: { value: "+0.8%", isPositive: true },
+      title: "Posts Scheduled",
+      description: "Upcoming scheduled posts",
+      icon: Clock,
+      value: isLoading ? "..." : stats?.postsScheduled.toString() || "0",
+      trend: { value: "+1", isPositive: true },
       gradient: "from-success/10 to-primary/10"
     },
     {
-      title: "Voice Messages",
-      description: "Days with posts this month",
-      icon: Calendar,
-      value: "18",
+      title: "Posts Published",
+      description: "Successfully published posts",
+      icon: Send,
+      value: isLoading ? "..." : stats?.postsPublished.toString() || "0",
       trend: { value: "+3", isPositive: true },
       gradient: "from-primary/10 to-accent/10"
     }
@@ -55,7 +58,7 @@ export const DashboardOverview = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
+          {dashboardStats.map((stat, index) => (
             <div 
               key={stat.title} 
               className="animate-slide-up hover-lift" 

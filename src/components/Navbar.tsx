@@ -1,5 +1,5 @@
 
-import { Linkedin, Settings, BarChart3, Sparkles, Bot, LogOut, User } from "lucide-react";
+import { Linkedin, Settings, BarChart3, Sparkles, Bot, LogOut, User, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -10,10 +10,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PricingDialog } from "@/components/PricingDialog";
+import { useState } from "react";
 
 export const Navbar = () => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const [isPricingOpen, setIsPricingOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -56,6 +59,16 @@ export const Navbar = () => {
           </div>
 
           <div className="flex items-center space-x-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setIsPricingOpen(true)}
+              className="hover:bg-primary/10 border border-transparent hover:border-primary/20 transition-all duration-200"
+            >
+              <DollarSign className="h-4 w-4 hover:text-primary transition-colors" />
+              <span className="hidden sm:inline ml-2 text-sm font-medium">Pricing</span>
+            </Button>
+            
             {user && (
               <>
                 <Button variant="ghost" size="sm" className="hover:bg-accent/10 border border-transparent hover:border-accent/20 transition-all duration-200">
@@ -91,6 +104,11 @@ export const Navbar = () => {
           </div>
         </div>
       </div>
+      
+      <PricingDialog 
+        open={isPricingOpen} 
+        onOpenChange={setIsPricingOpen} 
+      />
     </nav>
   );
 };
