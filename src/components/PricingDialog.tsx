@@ -65,7 +65,7 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
     {
       id: 'solo-in',
       name: 'Solo',
-      price: 4.99,
+      price: 499,
       credits: 30,
       features: [
         '30 Credits / Month',
@@ -78,7 +78,7 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
     {
       id: 'startup-in',
       name: 'Startup',
-      price: 9.99,
+      price: 999,
       credits: 60,
       popular: true,
       features: [
@@ -97,7 +97,7 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
     {
       id: 'solo-global',
       name: 'Solo',
-      price: 9.99,
+      price: 999,
       credits: 30,
       features: [
         '30 Credits / Month',
@@ -110,7 +110,7 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
     {
       id: 'startup-global',
       name: 'Startup',
-      price: 14.99,
+      price: 1499,
       credits: 60,
       popular: true,
       features: [

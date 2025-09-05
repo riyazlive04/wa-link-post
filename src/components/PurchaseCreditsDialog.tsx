@@ -23,7 +23,7 @@ const PAYMENT_PLANS = {
   'solo-in': {
     currency: 'INR',
     symbol: '₹',
-    amount: 4.99,
+    amount: 499,
     credits: 30,
     popular: true,
     region: 'Solo Plan',
@@ -33,7 +33,7 @@ const PAYMENT_PLANS = {
   'startup-in': {
     currency: 'INR',
     symbol: '₹',
-    amount: 9.99,
+    amount: 999,
     credits: 60,
     popular: false,
     region: 'Startup Plan',

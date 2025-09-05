@@ -9,22 +9,22 @@ const corsHeaders = {
 // Payment plans configuration
 const PAYMENT_PLANS = {
   'solo-in': {
-    amount: 499, // ₹4.99 in paise
+    amount: 49900, // ₹499 in paise
     currency: 'INR',
     credits: 30
   },
   'startup-in': {
-    amount: 999, // ₹9.99 in paise
+    amount: 99900, // ₹999 in paise
     currency: 'INR',
     credits: 60
   },
   'solo-global': {
-    amount: 999, // ₹9.99 in paise
+    amount: 99900, // ₹999 in paise
     currency: 'INR',
     credits: 30
   },
   'startup-global': {
-    amount: 1499, // ₹14.99 in paise
+    amount: 149900, // ₹1499 in paise
     currency: 'INR',
     credits: 60
   }
