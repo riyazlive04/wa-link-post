@@ -20,6 +20,16 @@ interface PurchaseCreditsDialogProps {
 }
 
 const PAYMENT_PLANS = {
+  'free-tier': {
+    currency: 'INR',
+    symbol: '₹',
+    amount: 0,
+    credits: 5,
+    popular: true,
+    region: 'Solo Plan',
+    icon: IndianRupee,
+    planId: 'free-tier'
+  },
   'solo-in': {
     currency: 'INR',
     symbol: '₹',
