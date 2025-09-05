@@ -129,7 +129,7 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
 
   const handlePurchase = async (plan: PricingPlan) => {
     try {
-      await purchaseCredits('USD');
+      await purchaseCredits(plan.id);
       onOpenChange(false);
     } catch (error) {
       toast({

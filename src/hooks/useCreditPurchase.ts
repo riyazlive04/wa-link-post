@@ -47,7 +47,7 @@ export const useCreditPurchase = () => {
     });
   }, []);
 
-  const purchaseCredits = useCallback(async (currency: 'INR' | 'USD' = 'INR') => {
+  const purchaseCredits = useCallback(async (planId: string = 'solo-global') => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -67,10 +67,10 @@ export const useCreditPurchase = () => {
       }
 
       // Create payment order
-      console.log('Creating payment order for currency:', currency);
+      console.log('Creating payment order for plan:', planId);
       const { data: orderData, error: orderError } = await supabase.functions.invoke(
         'create-payment-order',
-        { body: { currency } }
+        { body: { planId } }
       );
 
       if (orderError || !orderData?.success) {

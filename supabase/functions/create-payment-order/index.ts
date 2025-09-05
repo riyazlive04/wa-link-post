@@ -8,15 +8,25 @@ const corsHeaders = {
 
 // Payment plans configuration
 const PAYMENT_PLANS = {
-  INR: {
-    amount: 49900, // ₹499 in paise
-    currency: 'INR',
+  'solo-in': {
+    amount: 499, // $4.99 in cents
+    currency: 'USD',
     credits: 30
   },
-  USD: {
-    amount: 1099, // $10.99 in cents
-    currency: 'USD', 
+  'startup-in': {
+    amount: 999, // $9.99 in cents
+    currency: 'USD',
+    credits: 60
+  },
+  'solo-global': {
+    amount: 999, // $9.99 in cents
+    currency: 'USD',
     credits: 30
+  },
+  'startup-global': {
+    amount: 1499, // $14.99 in cents
+    currency: 'USD',
+    credits: 60
   }
 };
 
@@ -44,14 +54,14 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { currency = 'INR' } = await req.json();
+    const { planId = 'solo-global' } = await req.json();
 
-    // Validate currency and get plan
-    if (!PAYMENT_PLANS[currency as keyof typeof PAYMENT_PLANS]) {
-      throw new Error("Invalid currency. Supported: INR, USD");
+    // Validate plan and get plan details
+    if (!PAYMENT_PLANS[planId as keyof typeof PAYMENT_PLANS]) {
+      throw new Error("Invalid plan. Supported: solo-in, startup-in, solo-global, startup-global");
     }
 
-    const plan = PAYMENT_PLANS[currency as keyof typeof PAYMENT_PLANS];
+    const plan = PAYMENT_PLANS[planId as keyof typeof PAYMENT_PLANS];
     console.log('Creating order for plan:', plan);
 
     // Create Razorpay order
