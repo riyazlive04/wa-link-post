@@ -75,30 +75,16 @@ serve(async (req) => {
     const plan = PAYMENT_PLANS[planId as keyof typeof PAYMENT_PLANS];
     console.log('Creating order for plan:', plan);
 
-    // Create Razorpay order - Debugging credentials access
-    console.log('Attempting to read Razorpay credentials...');
-    console.log('All environment variables available:', Object.keys(Deno.env.toObject()));
-    
+    // Create Razorpay order
+    console.log('Creating order for plan:', plan);
+
     const razorpayKeyId = Deno.env.get("RAZORPAY_KEY_ID");
     const razorpayKeySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
 
-    console.log('RAZORPAY_KEY_ID exists:', !!razorpayKeyId);
-    console.log('RAZORPAY_KEY_SECRET exists:', !!razorpayKeySecret);
-    
-    if (razorpayKeyId) {
-      console.log('RAZORPAY_KEY_ID first 10 chars:', razorpayKeyId.substring(0, 10));
-    }
-    if (razorpayKeySecret) {
-      console.log('RAZORPAY_KEY_SECRET first 10 chars:', razorpayKeySecret.substring(0, 10));
-    }
-    
     if (!razorpayKeyId || !razorpayKeySecret) {
-      console.error('Razorpay credentials missing after detailed check');
-      console.error('RAZORPAY_KEY_ID:', razorpayKeyId ? 'Found' : 'Missing');
-      console.error('RAZORPAY_KEY_SECRET:', razorpayKeySecret ? 'Found' : 'Missing');
-      throw new Error("Razorpay credentials not configured - check edge function secrets");
+      console.error('Razorpay credentials not configured');
+      throw new Error("Razorpay credentials not configured");
     }
-    console.log('Razorpay credentials found successfully');
 
     // Generate unique receipt ID
     const receiptId = `receipt_${user.id.substring(0, 8)}_${Date.now()}`;
