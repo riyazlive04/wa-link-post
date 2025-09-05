@@ -53,7 +53,7 @@ const PAYMENT_PLANS = {
 };
 
 export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDialogProps) => {
-  const [selectedPlan, setSelectedPlan] = useState<'solo-in' | 'startup-in'>('solo-in');
+  const [selectedPlan, setSelectedPlan] = useState<'free-tier' | 'solo-in' | 'startup-in'>('free-tier');
   const { purchaseCredits, isProcessing } = useCreditPurchase();
   const { available_credits, recent_payments } = useUserCredits();
 
@@ -113,7 +113,7 @@ export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDia
                         ? 'ring-2 ring-primary border-primary bg-primary/5 shadow-lg' 
                         : 'hover:border-primary/30'
                     }`}
-                    onClick={() => setSelectedPlan(key as 'solo-in' | 'startup-in')}
+                    onClick={() => setSelectedPlan(key as 'free-tier' | 'solo-in' | 'startup-in')}
                   >
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
@@ -123,7 +123,7 @@ export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDia
                           </div>
                           <div>
                             <CardTitle className="text-xl font-bold">
-                              {planData.symbol}{planData.amount}
+                              {key === 'free-tier' ? 'Start with 5 credits' : `${planData.symbol}${planData.amount}`}
                             </CardTitle>
                             <CardDescription className="text-sm">
                               {planData.region}
@@ -226,7 +226,12 @@ export const PurchaseCreditsDialog = ({ open, onOpenChange }: PurchaseCreditsDia
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing Payment...
+                  Processing...
+                </>
+              ) : selectedPlan === 'free-tier' ? (
+                <>
+                  <Coins className="mr-2 h-4 w-4" />
+                  Get Free Credits
                 </>
               ) : (
                 <>
