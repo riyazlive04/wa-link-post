@@ -63,6 +63,19 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
 
   const indianPlans: PricingPlan[] = [
     {
+      id: 'free-tier',
+      name: 'Free Tier',
+      price: 0,
+      credits: 5,
+      features: [
+        '5 Free Credits',
+        'Voice Message Processing',
+        'AI Content Generation',
+        'LinkedIn Auto-Posting',
+        'Basic Analytics'
+      ]
+    },
+    {
       id: 'solo-in',
       name: 'Solo',
       price: 499,
@@ -94,6 +107,19 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
   ];
 
   const globalPlans: PricingPlan[] = [
+    {
+      id: 'free-tier',
+      name: 'Free Tier',
+      price: 0,
+      credits: 5,
+      features: [
+        '5 Free Credits',
+        'Voice Message Processing',
+        'AI Content Generation',
+        'LinkedIn Auto-Posting',
+        'Basic Analytics'
+      ]
+    },
     {
       id: 'solo-global',
       name: 'Solo',
@@ -159,7 +185,7 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-6 mt-8">
+          <div className="grid md:grid-cols-3 gap-6 mt-8">
             {plans.map((plan) => (
               <div
                 key={plan.id}
@@ -183,16 +209,24 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
                       {plan.name}
                     </h3>
                     <p className="text-muted-foreground mt-2">
-                      For {plan.name === 'Solo' ? 'personal brand' : 'small marketing teams'}
+                      For {plan.name === 'Solo' ? 'personal brand' : plan.name === 'Free Tier' ? 'getting started' : 'small marketing teams'}
                     </p>
                   </div>
 
                   <div className="text-center mt-6">
                     <div className="flex items-baseline justify-center">
-                      <span className="text-4xl font-bold text-foreground">
-                        ₹{plan.price}
-                      </span>
-                      <span className="text-muted-foreground ml-2">/month</span>
+                      {plan.price === 0 ? (
+                        <span className="text-4xl font-bold text-success">
+                          FREE
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-4xl font-bold text-foreground">
+                            ₹{plan.price}
+                          </span>
+                          <span className="text-muted-foreground ml-2">/month</span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -212,7 +246,7 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
                     disabled={isProcessing}
                   >
                     <CreditCard className="h-4 w-4 mr-2" />
-                    {isProcessing ? 'Processing...' : 'Subscribe Now'}
+                    {isProcessing ? 'Processing...' : plan.price === 0 ? 'Get Free Credits' : 'Subscribe Now'}
                   </Button>
                 </div>
               </div>
