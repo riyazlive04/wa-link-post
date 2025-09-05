@@ -63,19 +63,6 @@ export const PricingDialog = ({ open, onOpenChange }: PricingDialogProps) => {
 
   const indianPlans: PricingPlan[] = [
     {
-      id: 'free-tier',
-      name: 'Free',
-      price: 000,
-      credits: 5,
-      features: [
-        '5 Credits',
-        'Voice Message Processing',
-        'AI Content Generation',
-        'LinkedIn Auto-Posting',
-        'Basic Analytics'
-      ]
-    },
-    {
       id: 'solo-in',
       name: 'Solo',
       price: 499,
