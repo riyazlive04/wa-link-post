@@ -63,19 +63,19 @@ export const Navbar = () => {
               variant="ghost" 
               size="sm" 
               onClick={() => setIsPricingOpen(true)}
-              className="hover:bg-primary/10 border border-transparent hover:border-primary/20 transition-all duration-200"
+              className="hover:bg-accent hover:text-accent-foreground transition-all duration-200"
             >
-              <DollarSign className="h-4 w-4 hover:text-primary transition-colors" />
+              <DollarSign className="h-4 w-4 transition-colors" />
               <span className="hidden sm:inline ml-2 text-sm font-medium">Pricing</span>
             </Button>
             
             {user && (
               <>
-                <Button variant="ghost" size="sm" className="hover:bg-accent/10 border border-transparent hover:border-accent/20 transition-all duration-200">
-                  <BarChart3 className="h-4 w-4 hover:text-accent transition-colors" />
+                <Button variant="ghost" size="sm" className="hover:bg-accent hover:text-accent-foreground transition-all duration-200">
+                  <BarChart3 className="h-4 w-4 transition-colors" />
                 </Button>
 
-                <Button variant="ghost" size="sm" className="hover:bg-muted/50 border border-transparent hover:border-border transition-all duration-200">
+                <Button variant="ghost" size="sm" className="hover:bg-accent hover:text-accent-foreground transition-all duration-200">
                   <Settings className="h-4 w-4 hover:rotate-90 transition-transform duration-300" />
                 </Button>
 
