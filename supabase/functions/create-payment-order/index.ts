@@ -36,7 +36,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log('Function called - Method:', req.method);
+  
   try {
+    console.log('Creating Supabase client...');
+    
     // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -44,6 +48,7 @@ serve(async (req) => {
     );
 
     // Get authenticated user
+    console.log('Getting authenticated user...');
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
     const { data } = await supabaseClient.auth.getUser(token);
@@ -52,12 +57,18 @@ serve(async (req) => {
     if (!user) {
       throw new Error("User not authenticated");
     }
+    console.log('User authenticated:', user.id);
 
     // Parse request body
-    const { planId = 'solo-global' } = await req.json();
+    console.log('Parsing request body...');
+    const body = await req.json();
+    console.log('Request body received:', body);
+    const { planId = 'solo-global' } = body;
+    console.log('Plan ID extracted:', planId);
 
     // Validate plan and get plan details
     if (!PAYMENT_PLANS[planId as keyof typeof PAYMENT_PLANS]) {
+      console.error('Invalid plan ID:', planId);
       throw new Error("Invalid plan. Supported: solo-in, startup-in, solo-global, startup-global");
     }
 
@@ -69,8 +80,10 @@ serve(async (req) => {
     const razorpayKeySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
 
     if (!razorpayKeyId || !razorpayKeySecret) {
+      console.error('Razorpay credentials missing');
       throw new Error("Razorpay credentials not configured");
     }
+    console.log('Razorpay credentials found');
 
     // Generate unique receipt ID
     const receiptId = `receipt_${user.id.substring(0, 8)}_${Date.now()}`;
@@ -130,6 +143,8 @@ serve(async (req) => {
       console.error('Failed to store payment record:', insertError);
       throw new Error('Failed to store payment record');
     }
+
+    console.log('Payment record stored successfully');
 
     // Return order details for frontend
     return new Response(
