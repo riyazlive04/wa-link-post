@@ -1,5 +1,5 @@
 
-import { Linkedin, Settings, BarChart3, Sparkles, Bot, LogOut, User, DollarSign } from "lucide-react";
+import { Linkedin, Settings, BarChart3, Sparkles, Bot, LogOut, User, IndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -65,7 +65,7 @@ export const Navbar = () => {
               onClick={() => setIsPricingOpen(true)}
               className="hover:bg-accent hover:text-accent-foreground transition-all duration-200"
             >
-              <DollarSign className="h-4 w-4 transition-colors" />
+              <IndianRupee className="h-4 w-4 transition-colors" />
               <span className="hidden sm:inline ml-2 text-sm font-medium">Pricing</span>
             </Button>
             
